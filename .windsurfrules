@@ -1,0 +1,29 @@
+# Project Structure Guide
+
+This document provides an overview of the PokemonRaffleHub project structure.
+
+## Key Configuration Files:
+
+*   **[package.json](mdc:package.json):** Defines project dependencies, scripts, and metadata.
+*   **[vite.config.ts](mdc:vite.config.ts):** Configuration for Vite, the frontend build tool.
+*   **[tailwind.config.ts](mdc:tailwind.config.ts):** Configuration for Tailwind CSS.
+*   **[drizzle.config.ts](mdc:drizzle.config.ts):** Configuration for Drizzle ORM.
+*   **[tsconfig.json](mdc:tsconfig.json):** TypeScript compiler options for the project.
+
+## Core Directories:
+
+*   **[client/](mdc:client/):** Contains the frontend application code.
+    *   **[client/src/pages/](mdc:client/src/pages/):** Houses the page components for different routes.
+    *   **[client/src/components/](mdc:client/src/components/):** Contains reusable UI components used throughout the client application.
+    *   **[client/src/contexts/](mdc:client/src/contexts/):** Holds React Context API implementations for state management.
+    *   **[client/src/hooks/](mdc:client/src/hooks/):** Stores custom React hooks.
+    *   **[client/public/](mdc:client/public/):** Static assets served by the client.
+*   **[server/](mdc:server/):** Contains the backend application code, likely handling API requests and business logic.
+*   **[shared/](mdc:shared/):** Intended for code that is shared between the client and server applications (e.g., type definitions, utility functions).
+*   **[drizzle/](mdc:drizzle/):** Contains database migration files and schema definitions managed by Drizzle ORM.
+*   **[tests/](mdc:tests/):** Contains various types of tests for the project, including client, server, and integration tests.
+
+## Other Important Files:
+
+*   **[README.md](mdc:README.md):** General information about the project.
+*   **[TODO.md](mdc:TODO.md):** A list of tasks and pending items for the project.
