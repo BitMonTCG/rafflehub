@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useRaffle } from '@/hooks/useRaffles';
+import { Raffle } from '@/types';
 import { Helmet } from 'react-helmet';
 import { formatPrice, getTimeRemaining } from '@/utils/format';
 import { motion } from 'framer-motion';
@@ -15,6 +16,57 @@ import { Link } from 'wouter';
 import { useWinnerByRaffle, useWinnersByUser } from '@/hooks/useWinners';
 import WinnerCelebration from '@/components/raffle/WinnerCelebration';
 import CountdownTimer from '@/components/ui/CountdownTimer';
+
+// Helper functions for pricing calculations and source links
+// Calculate ticket price: retail price / total tickets (minimum $1)
+const calculateTicketPrice = (raffle: Raffle): string => {
+  const rawTicketPrice = raffle.retailPrice / 100 / raffle.totalTickets;
+  const ticketPrice = Math.max(1, Math.ceil(rawTicketPrice * 100) / 100);
+  return ticketPrice.toFixed(2);
+};
+
+// Calculate price for multiple tickets
+const calculateMultiTicketPrice = (raffle: Raffle, quantity: number): string => {
+  const singlePrice = parseFloat(calculateTicketPrice(raffle));
+  return (singlePrice * quantity).toFixed(2);
+};
+
+// Helper functions for price source links and names
+const getPriceSourceUrl = (source: string): string => {
+  switch (source.toLowerCase()) {
+    case 'pricecharting':
+      return 'https://www.pricecharting.com/';
+    case 'collectr':
+      return 'https://collectr.com/';
+    case 'ebay':
+      return 'https://www.ebay.com/';
+    case 'psa':
+      return 'https://www.psacard.com/prices/';
+    case 'tcgplayer':
+      return 'https://www.tcgplayer.com/';
+    default:
+      return '#';
+  }
+};
+
+const getPriceSourceName = (source: string): string => {
+  switch (source.toLowerCase()) {
+    case 'pricecharting':
+      return 'PriceCharting';
+    case 'collectr':
+      return 'Collectr';
+    case 'ebay':
+      return 'eBay';
+    case 'psa':
+      return 'PSA';
+    case 'tcgplayer':
+      return 'TCGPlayer';
+    case 'manual':
+      return 'Manual Price Entry';
+    default:
+      return source;
+  }
+};
 
 const RaffleDetail: React.FC = () => {
   const [, params] = useRoute('/raffle/:id');
@@ -271,13 +323,18 @@ const RaffleDetail: React.FC = () => {
                 />
               </div>
               
-              <div className="flex justify-between mt-2 text-sm text-gray-600">
-                <div className="flex items-center">
-                  <CountdownTimer endDate={raffle.endDate} size="sm" />
+              <div className="flex flex-col space-y-2 mt-2 text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <div className="flex items-center">
+                    <CountdownTimer endDate={raffle.endDate} size="sm" />
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Users className="h-3.5 w-3.5" />
+                    <span>{raffle.soldTickets} participants</span>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <Users className="h-3.5 w-3.5" />
-                  <span>{raffle.soldTickets} participants</span>
+                <div className="flex justify-end">
+                  <span className="text-xs text-gray-500">Created: {new Date(raffle.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
@@ -313,36 +370,55 @@ const RaffleDetail: React.FC = () => {
                   </li>
                   <li className="flex items-start">
                     <Check className="text-[#3B4CCA] mr-2 h-5 w-5 shrink-0" />
-                    <span>Winner gets to purchase the card at 50% off retail price</span>
+                    <span>Winner gets to purchase the card at 40% off retail price</span>
                   </li>
+                  {raffle.priceSource && (
+                    <li className="flex items-start">
+                      <Check className="text-[#3B4CCA] mr-2 h-5 w-5 shrink-0" />
+                      <span>
+                        Pricing data sourced from: {' '}
+                        <a 
+                          href={getPriceSourceUrl(raffle.priceSource)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-[#3B4CCA] hover:underline"
+                        >
+                          {getPriceSourceName(raffle.priceSource)}
+                        </a>
+                      </span>
+                    </li>
+                  )}
                 </ul>
               </TabsContent>
             </Tabs>
             
-            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
-              <Button
-                className="bg-[#FF5350] hover:bg-red-600 text-white font-poppins font-bold py-6 flex-1"
-                onClick={handlePurchaseTickets}
-                disabled={!raffle.isActive || raffle.soldTickets >= raffle.totalTickets}
-              >
-                {!raffle.isActive 
-                  ? "Raffle Ended" 
-                  : raffle.soldTickets >= raffle.totalTickets 
-                    ? "Sold Out" 
-                    : "Buy Ticket - $1"}
-              </Button>
-              <Button
-                className="bg-[#FFDE00] hover:bg-yellow-500 text-[#212121] font-poppins font-bold py-6 flex-1"
-                onClick={handlePurchaseTickets}
-                disabled={!raffle.isActive || raffle.soldTickets >= raffle.totalTickets}
-              >
-                {!raffle.isActive 
-                  ? "Raffle Ended" 
-                  : raffle.soldTickets >= raffle.totalTickets 
-                    ? "Sold Out" 
-                    : "Buy 5 Tickets - $5"}
-              </Button>
-            </div>
+            {/* Calculate ticket price based on retail price divided by total tickets (min $1) */}
+            {raffle && (
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <Button
+                  className="bg-[#FF5350] hover:bg-red-600 text-white font-poppins font-bold py-6 flex-1"
+                  onClick={handlePurchaseTickets}
+                  disabled={!raffle.isActive || raffle.soldTickets >= raffle.totalTickets}
+                >
+                  {!raffle.isActive 
+                    ? "Raffle Ended" 
+                    : raffle.soldTickets >= raffle.totalTickets 
+                      ? "Sold Out" 
+                      : `Buy Ticket - $${calculateTicketPrice(raffle)}`}
+                </Button>
+                <Button
+                  className="bg-[#FFDE00] hover:bg-yellow-500 text-[#212121] font-poppins font-bold py-6 flex-1"
+                  onClick={handlePurchaseTickets}
+                  disabled={!raffle.isActive || raffle.soldTickets >= raffle.totalTickets}
+                >
+                  {!raffle.isActive 
+                    ? "Raffle Ended" 
+                    : raffle.soldTickets >= raffle.totalTickets 
+                      ? "Sold Out" 
+                      : `Buy 5 Tickets - $${calculateMultiTicketPrice(raffle, 5)}`}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

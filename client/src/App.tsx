@@ -14,6 +14,7 @@ import Register from "@/pages/Register";
 import Admin from "@/pages/Admin";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
+import HowToBuyCrypto from "@/pages/HowToBuyCrypto";
 import { useEffect } from "react";
 import { webSocketService } from "@/lib/websocket";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/raffle/:id" component={RaffleDetail} />
       <Route path="/winners" component={Winners} />
       <Route path="/how-it-works" component={HowItWorks} />
+      <Route path="/how-to-buy-crypto" component={HowToBuyCrypto} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/terms-of-service" component={TermsOfService} />
       <Route path="/login" component={Login} />

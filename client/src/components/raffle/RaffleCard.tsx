@@ -25,6 +25,7 @@ const RaffleCard: React.FC<RaffleCardProps> = ({ raffle }) => {
   const [startInZoomMode, setStartInZoomMode] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(getTimeRemaining(raffle.endDate));
   const [isFlipped, setIsFlipped] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const { isAuthenticated, requireAuth } = useAuth();
   const buyTicket = useBuyTicket();
 
@@ -85,10 +86,26 @@ const RaffleCard: React.FC<RaffleCardProps> = ({ raffle }) => {
         return 'bg-purple-600';
       case 'holo':
         return 'bg-blue-600';
+      case 'reverse holo':
+        return 'bg-blue-400';
       case 'secret rare':
         return 'bg-green-600';
       case 'ultra premium':
         return 'bg-amber-500';
+      case 'illustration rare':
+        return 'bg-indigo-500';
+      case 'special illustration rare':
+        return 'bg-pink-500';
+      case 'rainbow rare':
+        return 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500';
+      case 'hyper rare':
+        return 'bg-gradient-to-r from-yellow-500 to-red-500';
+      case 'full art':
+        return 'bg-teal-500';
+      case 'common':
+        return 'bg-gray-400';
+      case 'uncommon':
+        return 'bg-emerald-400';
       default:
         return 'bg-gray-600';
     }
@@ -125,10 +142,21 @@ const RaffleCard: React.FC<RaffleCardProps> = ({ raffle }) => {
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <img 
-                    src={raffle.imageUrl} 
+                    src={imageError ? 'https://via.placeholder.com/500x700?text=Pokemon+Card' : raffle.imageUrl} 
                     alt={raffle.title} 
                     className="object-cover w-full h-full"
+                    onError={() => setImageError(true)}
                   />
+                  
+                  {/* PSA Grading Badge */}
+                  {raffle.psaGrade && (
+                    <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md border border-gray-200">
+                      <div className="flex items-center">
+                        <span className="text-xs font-bold text-gray-800">PSA</span>
+                        <span className="ml-1 text-sm font-bold text-red-600">{raffle.psaGrade}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {/* Back of card */}
                 <div 
@@ -139,9 +167,10 @@ const RaffleCard: React.FC<RaffleCardProps> = ({ raffle }) => {
                   }}
                 >
                   <img 
-                    src={POKEMON_CARD_BACK} 
+                    src={raffle.backImageUrl || POKEMON_CARD_BACK} 
                     alt="Pokémon Card Back" 
                     className="object-cover w-full h-full"
+                    onError={() => setImageError(true)}
                   />
                 </div>
               </div>
@@ -194,6 +223,11 @@ const RaffleCard: React.FC<RaffleCardProps> = ({ raffle }) => {
                 <span className="text-[#FF5350] font-poppins font-bold">
                   {formatPrice(raffle.winnerPrice)}
                 </span>
+                {raffle.psaCertNumber && (
+                  <span className="text-xs text-gray-500 mt-1">
+                    Cert #{raffle.psaCertNumber}
+                  </span>
+                )}
               </div>
             </div>
             

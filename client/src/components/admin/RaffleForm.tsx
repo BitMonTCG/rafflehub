@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -31,9 +32,13 @@ const formSchema = z.object({
   title: z.string().min(3, { message: 'Title must be at least 3 characters long' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters long' }),
   imageUrl: z.string().url({ message: 'Please enter a valid URL' }),
+  backImageUrl: z.string().url({ message: 'Please enter a valid URL' }).optional().or(z.literal('')),
   retailPrice: z.coerce.number().positive({ message: 'Retail price must be positive' }),
   winnerPrice: z.coerce.number().positive({ message: 'Winner price must be positive' }),
+  priceSource: z.string().optional(),
   rarity: z.string().min(1, { message: 'Please select a rarity' }),
+  psaGrade: z.coerce.number().int().min(1).max(10).optional(),
+  psaCertNumber: z.string().optional(),
   series: z.string().optional(),
   // First get the string value, then convert it to array for storage
   cardDetails: z.string().transform(str => str.split('\n').filter(s => s.trim().length > 0)),
@@ -41,7 +46,24 @@ const formSchema = z.object({
   isFeatured: z.boolean().default(false),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+// Define a custom type that matches the form schema's output structure
+interface FormValues {
+  title: string;
+  description: string;
+  imageUrl: string;
+  backImageUrl?: string;
+  retailPrice: number;
+  winnerPrice: number;
+  priceSource?: string;
+  rarity: string;
+  psaGrade?: number;
+  psaCertNumber?: string;
+  series?: string;
+  // This will be a string in the form but transformed to array on submit
+  cardDetails: string;
+  totalTickets: number;
+  isFeatured: boolean;
+}
 
 interface RaffleFormProps {
   raffle?: Raffle | null;
@@ -68,12 +90,16 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
     title: raffle?.title || '',
     description: raffle?.description || '',
     imageUrl: raffle?.imageUrl || '',
+    backImageUrl: raffle?.backImageUrl || '',
     retailPrice: raffle?.retailPrice ? raffle.retailPrice / 100 : undefined,
     winnerPrice: raffle?.winnerPrice ? raffle.winnerPrice / 100 : undefined,
+    priceSource: raffle?.priceSource || '',
     rarity: raffle?.rarity || '',
+    psaGrade: raffle?.psaGrade || undefined,
+    psaCertNumber: raffle?.psaCertNumber || '',
     series: raffle?.series || '',
     // Convert array to string for the form, it will be converted back on submit
-    cardDetails: raffle?.cardDetails ? raffle.cardDetails.join('\n') : '', 
+    cardDetails: raffle?.cardDetails ? raffle.cardDetails.join('\n') : '',
     totalTickets: raffle?.totalTickets || 100,
     isFeatured: raffle?.isFeatured || false,
   };
@@ -116,20 +142,17 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
   const selectCard = (card: PokemonCard) => {
     setSelectedCard(card);
     const raffleData = convertCardToRaffleData(card);
-    
-    // Update form fields
     form.setValue('title', raffleData.title);
     form.setValue('description', raffleData.description);
     form.setValue('imageUrl', raffleData.imageUrl);
-    form.setValue('retailPrice', raffleData.retailPrice / 100);
-    form.setValue('winnerPrice', raffleData.winnerPrice / 100);
+    form.setValue('retailPrice', raffleData.retailPrice);
+    form.setValue('winnerPrice', raffleData.winnerPrice);
     form.setValue('rarity', raffleData.rarity);
     form.setValue('series', raffleData.series || '');
+    // Convert cardDetails array to string for the form
     form.setValue('cardDetails', raffleData.cardDetails.join('\n'));
-    
-    // Clear search results
-    setSearchResults([]);
     setSearchQuery('');
+    setSearchResults([]);
   };
 
   const form = useForm<FormValues>({
@@ -139,25 +162,27 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
 
   const onSubmit = async (data: FormValues) => {
     try {
-      // Convert dollar amounts to cents for storage
+      // Convert dollar amounts to cents for storage and transform cardDetails to array
       const formattedData = {
         ...data,
         retailPrice: Math.round(data.retailPrice * 100),
         winnerPrice: Math.round(data.winnerPrice * 100),
+        // Convert string to array for API
+        cardDetails: data.cardDetails.split('\n').filter(s => s.trim().length > 0)
       };
-
+      
       if (isEditing && raffle) {
         await updateRaffle.mutateAsync({
           id: raffle.id,
-          data: formattedData,
+          data: formattedData as unknown as Partial<Raffle>
         });
       } else {
-        await createRaffle.mutateAsync(formattedData);
+        await createRaffle.mutateAsync(formattedData as unknown as Partial<Raffle>);
       }
       
       onClose();
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error('Failed to save raffle:', error);
     }
   };
 
@@ -323,9 +348,23 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
                 name="imageUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Image URL</FormLabel>
+                    <FormLabel>Front Image URL</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://example.com/image.jpg" {...field} />
+                      <Input placeholder="https://example.com/front-image.jpg" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="backImageUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Back Image URL (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://example.com/back-image.jpg" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -348,10 +387,18 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="Common">Common</SelectItem>
+                        <SelectItem value="Uncommon">Uncommon</SelectItem>
                         <SelectItem value="Rare">Rare</SelectItem>
-                        <SelectItem value="Ultra Rare">Ultra Rare</SelectItem>
                         <SelectItem value="Holo">Holo</SelectItem>
+                        <SelectItem value="Reverse Holo">Reverse Holo</SelectItem>
+                        <SelectItem value="Ultra Rare">Ultra Rare</SelectItem>
                         <SelectItem value="Secret Rare">Secret Rare</SelectItem>
+                        <SelectItem value="Rainbow Rare">Rainbow Rare</SelectItem>
+                        <SelectItem value="Illustration Rare">Illustration Rare</SelectItem>
+                        <SelectItem value="Special Illustration Rare">Special Illustration Rare</SelectItem>
+                        <SelectItem value="Hyper Rare">Hyper Rare</SelectItem>
+                        <SelectItem value="Full Art">Full Art</SelectItem>
                         <SelectItem value="Ultra Premium">Ultra Premium</SelectItem>
                       </SelectContent>
                     </Select>
@@ -361,30 +408,96 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="retailPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Retail Price ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" min="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="p-4 border border-gray-200 rounded-md bg-gray-50 mb-4">
+              <div className="mb-2">
+                <h3 className="font-semibold text-gray-700">Pricing Information</h3>
+                <p className="text-sm text-gray-500">Retail price is the original card price. Winner price is automatically calculated as retail price minus 40%.</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <FormField
+                  control={form.control}
+                  name="retailPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Retail Price ($)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          placeholder="29.99"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            // Auto-calculate winner price as retail price minus 40%
+                            const retailValue = parseFloat(e.target.value);
+                            if (!isNaN(retailValue)) {
+                              const winnerValue = retailValue * 0.6; // 60% of retail (40% discount)
+                              form.setValue('winnerPrice', Math.round(winnerValue * 100) / 100);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Set to the market value of the card
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="winnerPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Winner Price ($)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          placeholder="17.99"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Automatically calculated at 60% of retail price
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={form.control}
-                name="winnerPrice"
+                name="priceSource"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Winner Price ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" min="0" {...field} />
-                    </FormControl>
+                    <FormLabel>Price Source</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select price source" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="pricecharting">PriceCharting</SelectItem>
+                        <SelectItem value="collectr">Collectr</SelectItem>
+                        <SelectItem value="ebay">eBay</SelectItem>
+                        <SelectItem value="psa">PSA</SelectItem>
+                        <SelectItem value="tcgplayer">TCGPlayer</SelectItem>
+                        <SelectItem value="manual">Manual Entry</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Source used to determine the retail price
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -414,6 +527,52 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
                     <FormLabel>Total Tickets</FormLabel>
                     <FormControl>
                       <Input type="number" min="1" max="1000" {...field} disabled={isEditing} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            {/* PSA Grading Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+              <div className="col-span-2 mb-2">
+                <h3 className="font-semibold text-gray-700">PSA Grading Information (Optional)</h3>
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="psaGrade"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PSA Grade (1-10)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        max="10" 
+                        step="1" 
+                        placeholder="10"
+                        {...field}
+                        value={field.value === undefined ? '' : field.value}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="psaCertNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PSA Certification Number</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="123456789"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

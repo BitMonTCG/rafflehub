@@ -4,7 +4,7 @@ import axios from 'axios';
 const POKEMON_TCG_API_URL = 'https://api.pokemontcg.io/v2';
 
 // API key for higher rate limits
-const API_KEY = import.meta.env.POKEMON_TCG_API_KEY;
+const API_KEY = import.meta.env.VITE_POKEMON_TCG_API_KEY;
 
 // Create axios instance with auth header
 const pokemonApiClient = axios.create({
@@ -135,8 +135,8 @@ export function convertCardToRaffleData(card: PokemonCard) {
     }
   }
   
-  // Winner pays 50% of retail price
-  const winnerPrice = Math.round(retailPrice / 2);
+  // Winner pays retail price minus 40%
+  const winnerPrice = Math.round(retailPrice * 0.6); // 60% of retail price (40% discount)
   
   // Get card details
   const cardDetails = [

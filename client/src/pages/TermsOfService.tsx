@@ -10,8 +10,8 @@ const TermsOfService = () => {
           <h2 className="text-2xl font-semibold">Last Updated: May 5, 2025</h2>
           
           <p>
-            Welcome to BitMon. Please read these Terms of Service ("Terms") carefully as they contain important 
-            information about your legal rights, remedies, and obligations. By accessing or using BitMon, 
+            Welcome to BitMonTCG. Please read these Terms of Service ("Terms") carefully as they contain important 
+            information about your legal rights, remedies, and obligations. By accessing or using BitMonTCG, 
             you agree to be bound by these Terms and our Privacy Policy.
           </p>
         </section>
@@ -29,7 +29,7 @@ const TermsOfService = () => {
           <h2 className="text-2xl font-semibold">2. Services Description</h2>
           
           <p>
-            BitMon is a platform that allows users to participate in raffles for Pokemon-related digital assets. 
+            BitMonTCG is a platform that allows users to participate in raffles for Pokemon-related digital assets. 
             Our service enables users to:
           </p>
           <ul className="list-disc pl-6 space-y-1">
@@ -89,6 +89,11 @@ const TermsOfService = () => {
             <p>
               All raffles are conducted according to the specific rules stated for each raffle. By entering a raffle, 
               you agree to its specific rules in addition to these Terms.
+            </p>
+            <p>
+              <strong>Price Fluctuation:</strong> BitMonTCG reserves the right to adjust card prices if market prices fluctuate by more than 10% 
+              between the time a raffle is created and the time it is drawn. For market fluctuations less than 10%, the price remains locked. 
+              This adjustment right ensures that prices remain fair and reflective of significant market changes.
             </p>
           </div>
 
@@ -178,7 +183,7 @@ const TermsOfService = () => {
           <h2 className="text-2xl font-semibold">9. Limitation of Liability</h2>
           
           <p>
-            To the fullest extent permitted by law, in no event shall BitMon or its directors, employees, or affiliates 
+            To the fullest extent permitted by law, in no event shall BitMonTCG or its directors, employees, or affiliates 
             be liable for any indirect, special, incidental, consequential, or punitive damages, including but not limited to 
             loss of profits, data, use, goodwill, or other intangible losses, resulting from:
           </p>
@@ -195,7 +200,7 @@ const TermsOfService = () => {
           <h2 className="text-2xl font-semibold">10. Indemnification</h2>
           
           <p>
-            You agree to indemnify, defend, and hold harmless BitMon and its officers, directors, employees, agents, 
+            You agree to indemnify, defend, and hold harmless BitMonTCG and its officers, directors, employees, agents, 
             and affiliates from and against any and all claims, liabilities, damages, losses, costs, expenses, or fees 
             (including reasonable attorneys' fees) arising from:
           </p>
@@ -211,9 +216,8 @@ const TermsOfService = () => {
           <h2 className="text-2xl font-semibold">11. Governing Law and Jurisdiction</h2>
           
           <p>
-            These Terms shall be governed by and construed in accordance with the laws of [Jurisdiction], without regard to 
-            its conflict of law provisions. You agree to submit to the personal and exclusive jurisdiction of the courts 
-            located within [Jurisdiction] for the resolution of any disputes.
+            These Terms shall be governed by and construed in accordance with the laws of the applicable jurisdiction, without regard to 
+            its conflict of law provisions.
           </p>
         </section>
 
@@ -248,7 +252,7 @@ const TermsOfService = () => {
             If you have any questions about these Terms, please contact us at:
           </p>
           <p className="font-medium">
-            Email: legal@bitmon.com
+            Email: BitMonTCG@gmail.com
           </p>
         </section>
       </div>

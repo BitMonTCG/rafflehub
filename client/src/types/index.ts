@@ -11,9 +11,13 @@ export interface Raffle {
   title: string;
   description: string;
   imageUrl: string;
+  backImageUrl?: string; // Optional back image URL
   retailPrice: number; // in cents
   winnerPrice: number; // in cents
+  priceSource?: string; // Source of pricing data (e.g., eBay, PSA, pricecharting, collectr)
   rarity: string;
+  psaGrade?: number; // PSA grade (1-10)
+  psaCertNumber?: string; // PSA certification number
   series?: string;
   cardDetails: string[];
   totalTickets: number;

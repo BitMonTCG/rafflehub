@@ -70,6 +70,11 @@ const Header: React.FC = () => {
                 How It Works
               </a>
             </Link>
+            <Link href="/how-to-buy-crypto">
+              <a className={`font-medium ${location === '/how-to-buy-crypto' ? 'text-[#FF5350]' : 'hover:text-[#FF5350] transition-colors'}`}>
+                Buy Crypto
+              </a>
+            </Link>
           </nav>
           
           {/* Header Actions */}
@@ -175,6 +180,11 @@ const Header: React.FC = () => {
               <Link href="/how-it-works">
                 <a className={`font-medium ${location === '/how-it-works' ? 'text-[#FF5350]' : ''}`} onClick={toggleMenu}>
                   How It Works
+                </a>
+              </Link>
+              <Link href="/how-to-buy-crypto">
+                <a className={`font-medium ${location === '/how-to-buy-crypto' ? 'text-[#FF5350]' : ''}`} onClick={toggleMenu}>
+                  Buy Crypto
                 </a>
               </Link>
               {isAuthenticated ? (

@@ -17,7 +17,7 @@ const Footer: React.FC = () => {
                   <line x1="8" y1="12" x2="16" y2="12" />
                 </svg>
               </div>
-              <span className="text-2xl font-bold font-montserrat">BitMon</span>
+              <span className="text-2xl font-bold font-montserrat">BitMonTCG</span>
             </div>
             
             <p className="text-gray-400 mb-6">
@@ -110,18 +110,7 @@ const Footer: React.FC = () => {
             <ul className="space-y-2">
               <li className="flex items-start space-x-3">
                 <Mail className="text-gray-400 h-5 w-5 mt-1" />
-                <span className="text-gray-400">support@bitmon.com</span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <Phone className="text-gray-400 h-5 w-5 mt-1" />
-                <span className="text-gray-400">(555) 123-4567</span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <MapPin className="text-gray-400 h-5 w-5 mt-1" />
-                <span className="text-gray-400">
-                  123 Trading Card Lane<br />
-                  Pokémon City, PC 12345
-                </span>
+                <span className="text-gray-400">BitMonTCG@gmail.com</span>
               </li>
             </ul>
           </div>
@@ -130,7 +119,7 @@ const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-gray-500 text-sm mb-4 md:mb-0">
-            &copy; 2023 BitMon. All rights reserved. Pokémon and its trademarks are property of Nintendo.
+            &copy; {new Date().getFullYear()} BitMonTCG. All rights reserved. Pokémon and its trademarks are property of Nintendo.
           </p>
           
           <div className="flex space-x-4">

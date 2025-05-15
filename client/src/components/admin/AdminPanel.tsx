@@ -21,8 +21,11 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Trash2, Loader2, Edit, StopCircle } from 'lucide-react';
+import { Trash2, Loader2, Edit, StopCircle, Users, BarChart3, Mail } from 'lucide-react';
 import CountdownTimer from '@/components/ui/CountdownTimer';
+import UserProfileAudit from './UserProfileAudit';
+import EmailListVerification from './EmailListVerification';
+import UserCommunicationStrategy from './UserCommunicationStrategy';
 
 const AdminPanel: React.FC = () => {
   const { data: activeRaffles } = useRaffles(true);
@@ -98,6 +101,7 @@ const AdminPanel: React.FC = () => {
           <TabsTrigger value="all">All Raffles</TabsTrigger>
           <TabsTrigger value="winners">Winners</TabsTrigger>
           <TabsTrigger value="stats">Statistics</TabsTrigger>
+          <TabsTrigger value="users">Users & Communication</TabsTrigger>
         </TabsList>
         
         <TabsContent value="active">
@@ -336,6 +340,37 @@ const AdminPanel: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+        
+        <TabsContent value="users">
+          <Tabs defaultValue="profiles">
+            <TabsList className="mb-6">
+              <TabsTrigger value="profiles">
+                <Users className="h-4 w-4 mr-2" />
+                User Profiles
+              </TabsTrigger>
+              <TabsTrigger value="emails">
+                <Mail className="h-4 w-4 mr-2" />
+                Email List
+              </TabsTrigger>
+              <TabsTrigger value="communication">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Communication Strategy
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="profiles" className="mt-0">
+              <UserProfileAudit />
+            </TabsContent>
+            
+            <TabsContent value="emails" className="mt-0">
+              <EmailListVerification />
+            </TabsContent>
+            
+            <TabsContent value="communication" className="mt-0">
+              <UserCommunicationStrategy />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
       

@@ -47,10 +47,14 @@ export const raffles = table("raffles", {
   id: primaryKey(),
   title: textNotNull("title"),
   description: textNotNull("description"),
-  imageUrl: textNotNull("image_url"),
+  imageUrl: textNotNull("image_url"), // Front image URL
+  backImageUrl: text("back_image_url"), // Back image URL
   retailPrice: integerNotNull("retail_price"), // in cents
   winnerPrice: integerNotNull("winner_price"), // in cents
+  priceSource: text("price_source"), // Source of pricing data (e.g., eBay, PSA, pricecharting, collectr)
   rarity: textNotNull("rarity"),
+  psaGrade: integer("psa_grade"), // PSA grade (1-10)
+  psaCertNumber: text("psa_cert_number"), // PSA certification number
   series: text("series"),
   cardDetails: jsonText<string[]>("card_details", []),
   totalTickets: integerNotNull("total_tickets").default(100),

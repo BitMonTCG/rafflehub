@@ -6,7 +6,6 @@ import { useToast } from '@/hooks/use-toast';
 import HeroSection from '@/components/home/HeroSection';
 import RaffleStats from '@/components/home/RaffleStats';
 import ActiveRaffles from '@/components/home/ActiveRaffles';
-import FeaturedCard from '@/components/home/FeaturedCard';
 import HowItWorks from '@/components/home/HowItWorks';
 import RecentWinners from '@/components/home/RecentWinners';
 import Newsletter from '@/components/home/Newsletter';
@@ -86,7 +85,6 @@ const Home: React.FC = () => {
       <HeroSection />
       <RaffleStats />
       <ActiveRaffles />
-      <FeaturedCard />
       <HowItWorks />
       <RecentWinners />
       <Newsletter />
