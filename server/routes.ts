@@ -39,6 +39,11 @@ const sessionStore = usePgSession
       connectionString: process.env.DATABASE_URL,
       tableName: 'user_sessions',
       createTableIfMissing: true,
+      ssl: process.env.NODE_ENV === 'production', // Enable SSL for Supabase PostgreSQL
+      pool: {
+        max: 10, // Maximum number of clients in the pool
+        idleTimeoutMillis: 30000 // Close idle clients after 30 seconds
+      }
     })
   : new (Store as any)({
       checkPeriod: 86400000 // prune expired entries every 24h
@@ -160,10 +165,14 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     resave: true,  // Changed to true to ensure session is saved on each request
     saveUninitialized: false,
     cookie: {
-      secure: false,  // Set to false for development - this is critical for localhost
+      // Use secure cookies in production, non-secure in development
+      secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      sameSite: 'lax',  // Changed to lax for better compatibility in dev
-      maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
+      // In production, we want 'none' for cross-site cookies to work with Vercel deployment
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+      // Set domain for production if needed
+      // domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : undefined,
     },
     name: 'bitmon_sid', // Custom session name (not the default 'connect.sid')
   }));

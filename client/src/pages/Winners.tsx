@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useWinners } from '@/hooks/useWinners';
 import { useRaffles } from '@/hooks/useRaffles';
+import { Raffle, Winner } from '@/types';
 import { formatPrice, getRelativeTimeString } from '@/utils/format';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +22,7 @@ const Winners: React.FC = () => {
   const [hoveredWinnerCard, setHoveredWinnerCard] = useState<number | null>(null);
   
   // Filter winners by time period
-  const filteredWinners = winners?.filter(winner => {
+  const filteredWinners = winners?.filter((winner: import('@/types').Winner) => {
     if (timeFilter === 'all') return true;
     
     const announcedDate = new Date(winner.announcedAt);
@@ -42,7 +43,7 @@ const Winners: React.FC = () => {
   
   // Find raffle details for a winner
   const getRaffleDetails = (raffleId: number) => {
-    return raffles?.find(raffle => raffle.id === raffleId);
+    return raffles?.find((raffle: Raffle) => raffle.id === raffleId);
   };
   
   // Show confetti on page load
@@ -186,7 +187,7 @@ const Winners: React.FC = () => {
             <p className="text-gray-500">No winners found for the selected time period.</p>
           </div>
         ) : (
-          filteredWinners?.map(winner => {
+          filteredWinners?.map((winner: Winner) => {
             const raffle = getRaffleDetails(winner.raffleId);
             if (!raffle) return null;
             
@@ -197,7 +198,7 @@ const Winners: React.FC = () => {
               <motion.div 
                 key={winner.id} 
                 variants={item}
-                onMouseEnter={() => isUsersWin && setHoveredWinnerCard(user.id)}
+                onMouseEnter={() => isUsersWin && user && setHoveredWinnerCard(user.id)}
                 onMouseLeave={() => setHoveredWinnerCard(null)}
               >
                 <Card className={`overflow-hidden h-full hover:shadow-lg transition-shadow ${isUsersWin ? 'ring-2 ring-[#FFDE00]' : ''}`}>
