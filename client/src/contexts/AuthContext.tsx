@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string, isAdminLogin?: boolean) => Promise<boolean>;
   register: (username: string, email: string, password: string, confirmPassword: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -15,7 +15,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
-  login: async () => false,
+  login: async (_username, _password, _isAdminLogin) => false,
   register: async () => false,
   logout: () => {},
   isAuthenticated: false,
@@ -43,9 +43,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string, isAdminLogin?: boolean): Promise<boolean> => {
     try {
-      const response = await fetch('/api/login', {
+      const endpoint = isAdminLogin ? '/api/auth/admin/login' : '/api/login';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

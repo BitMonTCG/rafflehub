@@ -40,6 +40,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
+  const [location] = useLocation(); // Read current location
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [, navigate] = useLocation();
   
@@ -61,7 +62,8 @@ const Login: React.FC = () => {
     setIsLoggingIn(true);
     
     try {
-      const success = await login(data.username, data.password);
+      const isAdminLogin = location === '/admin-login'; // Check if current path is /admin-login
+      const success = await login(data.username, data.password, isAdminLogin);
       
       if (success) {
         // Redirect to home page on successful login

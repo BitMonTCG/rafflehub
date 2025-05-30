@@ -181,7 +181,8 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   app.use(passport.session());
 
   // Configure Passport Local Strategy for authentication
-  passport.use(new LocalStrategy(async (username, password, done) => {
+  // Strategy for regular database users
+  passport.use('user-local', new LocalStrategy(async (username, password, done) => {
     try {
       // Find user by username
       const user = await storageInstance.getUserByUsername(username);
@@ -208,6 +209,38 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     }
   }));
 
+  // Strategy for admin user from .env
+  passport.use('admin-strategy', new LocalStrategy(
+    {
+      usernameField: 'username', // Ensure these match your form field names
+      passwordField: 'password'
+    },
+    (username, password, done) => {
+      const adminUsername = process.env.ADMIN_USERNAME;
+      const adminPassword = process.env.ADMIN_PASSWORD;
+
+      if (!adminUsername || !adminPassword) {
+        log('Admin credentials are not set in environment variables.');
+        return done(null, false, { message: 'Admin configuration error.' });
+      }
+
+      if (username === adminUsername && password === adminPassword) {
+        // Create a user-like object for the admin
+        // IMPORTANT: Ensure this object structure is compatible with what passport.serializeUser expects
+        // and what your ensureAdmin middleware might expect (e.g., an 'id' and 'role' or 'isAdmin' property)
+        const adminUser = {
+          id: 'admin_user_id', // Static ID for the admin user session
+          username: adminUsername,
+          role: 'admin', // Add a role property
+          // Add any other properties your ensureAdmin or client-side might expect
+        };
+        return done(null, adminUser);
+      } else {
+        return done(null, false, { message: 'Incorrect admin username or password.' });
+      }
+    }
+  ));
+
   // --- Passport Serialization/Deserialization --- 
   // Store only the user ID in the session
   passport.serializeUser((user: any, done) => {
@@ -216,9 +249,32 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   });
 
   // Retrieve the full user object from the database using the ID from the session
-  passport.deserializeUser(async (id: number, done) => {
+  passport.deserializeUser(async (id: string | number, done) => { // Allow id to be string or number
     try {
-      const user = await storageInstance.getUserById(id);
+      if (id === 'admin_user_id') {
+      // Reconstruct the .env admin user object
+      const adminUsername = process.env.ADMIN_USERNAME;
+      if (!adminUsername) {
+        console.error('ADMIN_USERNAME not set, cannot deserialize .env admin');
+        return done(new Error('Admin configuration error'), null);
+      }
+      const envAdminUser = { 
+        id: 'admin_user_id', 
+        username: adminUsername, 
+        role: 'admin' 
+      };
+      // console.log(`Env Admin deserialized from session: ID=${envAdminUser.id}, Username=${envAdminUser.username}, Role=${envAdminUser.role}`);
+      return done(null, envAdminUser);
+    }
+
+    // Existing logic for numeric IDs (database users)
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : id; // Ensure it's a number for DB lookup
+    if (isNaN(numericId)) { 
+        console.warn(`deserializeUser received non-numeric, non-admin ID: ${id}`);
+        return done(null, null); 
+    }
+
+    const user = await storageInstance.getUserById(numericId);
       
       if (user) {
         // Ensure proper type conversion and remove password
@@ -258,7 +314,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
 
   // Authentication routes
   app.post('/api/login', loginLimiter, (req: Request, res: Response, next: NextFunction) => {
-    passport.authenticate('local', (err: any, user: User | false, info: { message: string }) => {
+    passport.authenticate('user-local', (err: any, user: User | false, info: { message: string }) => {
       if (err) { return next(err); }
       
       // Authentication failed
@@ -345,6 +401,29 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     }
   });
 
+  // Admin login route
+  app.post('/api/auth/admin/login', loginLimiter, (req, res, next) => { // Added loginLimiter here too
+    passport.authenticate('admin-strategy', (err: any, adminUser: any | false, info: { message: string }) => {
+      if (err) {
+        log(`Admin login error: ${err}`);
+        return next(err);
+      }
+      if (!adminUser) {
+        log(`Admin login failed: ${info.message}`);
+        return res.status(401).json({ message: info.message || 'Admin login failed' });
+      }
+      req.logIn(adminUser, (loginErr) => { // Changed err to loginErr to avoid conflict
+        if (loginErr) {
+          log(`Admin session error after login: ${loginErr}`);
+          return next(loginErr);
+        }
+        log(`Admin user ${adminUser.username} logged in successfully`);
+        // Send back a success message or the admin user object
+        return res.json({ message: 'Admin login successful', user: { username: adminUser.username, role: adminUser.role, id: adminUser.id } }); // Added id
+      });
+    })(req, res, next);
+  });
+
   app.post('/api/logout', (req: Request, res: Response, next: NextFunction) => {
     req.logout((err) => {
       if (err) { return next(err); }
@@ -390,13 +469,31 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     
     // Properly check admin privileges with explicit type handling
     if (req.isAuthenticated() && req.user) {
-      const userIsAdmin = 
-        (req.user as User).isAdmin === true || 
-        (req.user as any).isAdmin === 1;
-        
-      if (userIsAdmin) {
+      const userFromDb = req.user as User; // For users coming from DB via deserializeUser
+      const envAdminUser = req.user as { username?: string, role?: string }; // For .env admin user
+
+      const isDatabaseAdmin = userFromDb.isAdmin === true || (userFromDb.isAdmin as any) === 1;
+      const isEnvAdmin = envAdminUser.role === 'admin';
+
+      if (isDatabaseAdmin || isEnvAdmin) {
+        // Log which type of admin is accessing
+        // if (isEnvAdmin) {
+        //   console.log(`Admin access granted for .env admin: ${envAdminUser.username || 'N/A'}`);
+        // } else {
+        //   console.log(`Admin access granted for database admin: ${userFromDb.username}`);
+        // }
         return next();
+      } else {
+        // Log details if check fails but user object exists
+        console.log('Admin check failed. User details:', {
+          id: (req.user as any).id,
+          username: (req.user as any).username,
+          isAdmin: (req.user as any).isAdmin,
+          role: (req.user as any).role,
+        });
       }
+    } else {
+      console.log('Admin check failed: Not authenticated or no user object.');
     }
     
     // If we get here, user is not admin
