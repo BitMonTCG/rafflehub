@@ -31,6 +31,7 @@ function Router() {
       <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/terms-of-service" component={TermsOfService} />
       <Route path="/login" component={Login} />
+      <Route path="/admin-login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
