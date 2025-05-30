@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { log } from './vite';
+import { log } from './vite.js';
 
 interface EmailConfig {
   host: string;

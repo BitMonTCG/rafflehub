@@ -1,5 +1,5 @@
 import axios from 'axios'; // Keep axios for potential non-client use, or remove if unused
-import { log } from './vite';
+import { log } from './vite.js';
 // Import OpenAPI for configuration and specific services/types
 import { 
     OpenAPI, 

@@ -100,7 +100,8 @@ app.use((req, res, next) => {
     // doesn't interfere with the other routes
     if (app.get("env") === "development") {
       await setupVite(app, server);
-    } else {
+    } else if (!process.env.VERCEL) {
+      // Only run serveStatic if NOT on Vercel and in production-like mode
       serveStatic(app);
     }
 

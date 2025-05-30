@@ -5,7 +5,7 @@ import {
   InvoiceData,
 } from 'btcpay-greenfield-node-client';
 import crypto from 'crypto';
-import { log } from './vite';
+import { log } from './vite.js';
 import { btcpayConfig } from '../config/btcpay'; // Import configured storeId and webhookSecret
 
 // Constants

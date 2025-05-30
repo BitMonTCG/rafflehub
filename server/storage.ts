@@ -5,8 +5,8 @@ import {
   Winner, InsertWinner, 
   users, raffles, tickets, winners 
 } from "@shared/schema";
-import { sendWinnerNotification } from './emailService';
-import { log } from './vite';
+import { sendWinnerNotification } from './emailService.js';
+import { log } from './vite.js';
 
 export interface IStorage {
   // Database initialization
@@ -520,7 +520,7 @@ export class MemStorage implements IStorage {
 }
 
 // Import the DatabaseStorage class
-import { DatabaseStorage } from './DatabaseStorage';
+import { DatabaseStorage } from './DatabaseStorage.js';
 
 // Create and export a DatabaseStorage instance instead of MemStorage
 export const storage = new DatabaseStorage();

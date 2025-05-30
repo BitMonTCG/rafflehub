@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "tsc vite.config.ts --outDir . --module nodenext --target esnext --skipLibCheck --moduleResolution nodenext && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "tsc vite.config.ts --outDir . --module nodenext --target esnext --skipLibCheck --moduleResolution nodenext && vite build && esbuild server/index.ts --platform=node --bundle --format=esm --outdir=dist --external:express --external:dotenv --external:drizzle-orm --external:bcrypt --external:passport --external:express-session --external:connect-pg-simple --external:memorystore --external:btcpay-greenfield-node-client --external:express-rate-limit --external:helmet --external:crypto --external:fs --external:path --external:http --external:ws --external:nanoid --external:vite --external:@babel/* --external:lightningcss --external:fsevents --external:better-sqlite3 --external:sqlite3 --external:pg --external:postgres",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:generate-pg": "cross-env NODE_ENV=production drizzle-kit generate:pg --config ./drizzle.config.ts",
