@@ -12,20 +12,17 @@ import type {
   InsertTicket,
   Winner,
   InsertWinner,
-} from "@shared/schema";
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import type { SqliteSchema } from './db';
+} from "@shared/schema"; // Keep these type imports if they are distinct and necessary
+import type { PostgresJsDatabase, PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import { type PgSchema } from './db'; // Import PgSchema type from db.ts
 import { sendWinnerNotification } from './emailService';
 import { log } from './vite';
 
-// Define the types for the SQLite schema explicitly
-type DBSchema = SqliteSchema;
-type DBInstance = BetterSQLite3Database<DBSchema>;
-const sqliteDb = db as DBInstance;
-const sqliteUsers = users as DBSchema['users'];
-const sqliteRaffles = raffles as DBSchema['raffles'];
-const sqliteTickets = tickets as DBSchema['tickets'];
-const sqliteWinners = winners as DBSchema['winners'];
+// The 'db' and table objects (users, raffles, tickets, winners) are already imported on line 2.
+// No need for DBSchema or DBInstance type aliases if we use db and table objects directly with their imported types.
+
 
 export class DatabaseStorage implements IStorage {
   /**
@@ -136,29 +133,29 @@ export class DatabaseStorage implements IStorage {
   }
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await sqliteDb.select().from(sqliteUsers).where(eq(sqliteUsers.id, id)).limit(1);
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return user ?? undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await sqliteDb.select().from(sqliteUsers).where(eq(sqliteUsers.username, username)).limit(1);
+    const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
     return user ?? undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await sqliteDb.select().from(sqliteUsers).where(eq(sqliteUsers.email, email)).limit(1);
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     return user ?? undefined;
   }
 
   async getUserById(id: number): Promise<User | null> {
-    const [user] = await sqliteDb.select().from(sqliteUsers).where(eq(sqliteUsers.id, id)).limit(1);
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return user ?? null;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const validatedUser = insertUserSchema.parse(insertUser); // Validate before inserting
-    const [user] = await sqliteDb
-      .insert(sqliteUsers)
+    const [user] = await db
+      .insert(users)
       .values(validatedUser)
       .returning();
     if (!user) throw new Error('Failed to create user'); // Ensure user is returned
@@ -166,28 +163,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsers(): Promise<User[]> {
-    const usersList = await sqliteDb.select().from(sqliteUsers);
+    const usersList = await db.select().from(users);
     return usersList;
   }
 
   // Raffle methods
   async getRaffle(id: number): Promise<Raffle | undefined> {
-    const [raffle] = await sqliteDb.select().from(sqliteRaffles).where(eq(sqliteRaffles.id, id)).limit(1);
+    const [raffle] = await db.select().from(raffles).where(eq(raffles.id, id)).limit(1);
     return raffle ?? undefined;
   }
 
   async getRaffleById(id: number): Promise<Raffle | null> {
-    const [raffle] = await sqliteDb.select().from(sqliteRaffles).where(eq(sqliteRaffles.id, id));
+    const [raffle] = await db.select().from(raffles).where(eq(raffles.id, id));
     return raffle ?? null;
   }
 
   async getRaffles(activeOnly = false): Promise<Raffle[]> {
     // Create base query
-    const baseQuery = sqliteDb.select().from(sqliteRaffles).orderBy(desc(sqliteRaffles.createdAt));
+    const baseQuery = db.select().from(raffles).orderBy(desc(raffles.createdAt));
     
     // Apply filter conditionally
     const query = activeOnly 
-      ? baseQuery.where(eq(sqliteRaffles.isActive, true))
+      ? baseQuery.where(eq(raffles.isActive, true))
       : baseQuery;
       
     // Execute query
@@ -196,11 +193,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFeaturedRaffle(): Promise<Raffle | undefined> {
-    const [raffle] = await sqliteDb
+    const [raffle] = await db
       .select()
-      .from(sqliteRaffles)
-      .where(and(eq(sqliteRaffles.isFeatured, true), eq(sqliteRaffles.isActive, true)))
-      .orderBy(desc(sqliteRaffles.createdAt))
+      .from(raffles)
+      .where(and(eq(raffles.isFeatured, true), eq(raffles.isActive, true)))
+      .orderBy(desc(raffles.createdAt))
       .limit(1);
     return raffle ?? undefined;
   }
@@ -230,17 +227,17 @@ export class DatabaseStorage implements IStorage {
 
     // Using as any is a temporary workaround for TypeScript + Drizzle + Zod compatibility issues
   // A better long-term solution would be to align the Zod schema types with Drizzle's expected types
-  const [raffle] = await sqliteDb.insert(sqliteRaffles).values(raffleInsert as any).returning();
+  const [raffle] = await db.insert(raffles).values(raffleInsert as any).returning();
 
     if (!raffle) throw new Error('Failed to create raffle');
     return raffle;
   }
 
   async updateRaffle(id: number, data: Partial<Omit<Raffle, 'id' | 'createdAt' | 'userId'>>): Promise<Raffle | null> {
-    const [raffle] = await sqliteDb
-      .update(sqliteRaffles)
+    const [raffle] = await db
+      .update(raffles)
       .set(data)
-      .where(eq(sqliteRaffles.id, id))
+      .where(eq(raffles.id, id))
       .returning();
 
     return raffle ?? null;
@@ -248,7 +245,7 @@ export class DatabaseStorage implements IStorage {
 
   async endRaffle(id: number): Promise<Winner | undefined> {
     // Use a transaction to ensure atomicity of selecting winner and updating raffle
-    return await sqliteDb.transaction(async (tx) => {
+    return await db.transaction(async (tx: PgTransaction<PostgresJsQueryResultHKT, PgSchema, ExtractTablesWithRelations<PgSchema>>) => {
       // 1. Select the winner (using the existing private method, but passing the transaction context if needed)
       // Note: selectWinner currently uses its own transaction for winner insertion. 
       // We might need to refactor selectWinner to accept an optional transaction context `tx`
@@ -267,13 +264,13 @@ export class DatabaseStorage implements IStorage {
 
       // 2. Update the raffle within the same transaction
       const [updatedRaffle] = await tx // Use the transaction context 'tx'
-        .update(sqliteRaffles)
+        .update(raffles)
         .set({ 
           isActive: false, 
           endDate: new Date(), 
           winnerId: winner.id 
         })
-        .where(eq(sqliteRaffles.id, id))
+        .where(eq(raffles.id, id))
         .returning();
 
       if (!updatedRaffle) {
@@ -308,12 +305,12 @@ export class DatabaseStorage implements IStorage {
 
     // Delete associated tickets (pending/expired) first to maintain integrity
     // Although, if soldTickets is 0, there shouldn't be any 'paid' tickets.
-    await sqliteDb.delete(sqliteTickets).where(eq(sqliteTickets.raffleId, raffleId));
+    await db.delete(tickets).where(eq(tickets.raffleId, raffleId));
 
     // Delete the raffle
-    const [deletedRaffle] = await sqliteDb
-      .delete(sqliteRaffles)
-      .where(eq(sqliteRaffles.id, raffleId))
+    const [deletedRaffle] = await db
+      .delete(raffles)
+      .where(eq(raffles.id, raffleId))
       .returning();
 
     return deletedRaffle ?? null; // Return the deleted raffle data or null if somehow not found after delete
@@ -321,27 +318,27 @@ export class DatabaseStorage implements IStorage {
 
   // Ticket methods
   async getTicketById(id: number): Promise<Ticket | undefined> {
-    const [ticket] = await sqliteDb.select().from(sqliteTickets).where(eq(sqliteTickets.id, id)).limit(1);
+    const [ticket] = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
     return ticket ?? undefined;
   }
 
   async getTicketsByRaffle(raffleId: number): Promise<Ticket[]> {
-    const ticketsList = await sqliteDb.select().from(sqliteTickets).where(eq(sqliteTickets.raffleId, raffleId));
+    const ticketsList = await db.select().from(tickets).where(eq(tickets.raffleId, raffleId));
     return ticketsList;
   }
 
   async getTicketsByUser(userId: number): Promise<Ticket[]> {
-    const ticketsList = await sqliteDb.select().from(sqliteTickets).where(eq(sqliteTickets.userId, userId));
+    const ticketsList = await db.select().from(tickets).where(eq(tickets.userId, userId));
     return ticketsList;
   }
 
   async createTicket(insertTicket: InsertTicket): Promise<Ticket> {
     // Start a transaction since we need to update two related tables
     const validatedTicket = insertTicketSchema.parse(insertTicket); // Validate before transaction
-    const ticket = await sqliteDb.transaction(async (tx) => {
+    const ticket = await db.transaction(async (tx: PgTransaction<PostgresJsQueryResultHKT, PgSchema, ExtractTablesWithRelations<PgSchema>>) => {
       // Create the ticket
       const [newTicket] = await tx
-        .insert(sqliteTickets)
+        .insert(tickets)
         .values(validatedTicket) // Use validated data
         .returning();
 
@@ -352,9 +349,9 @@ export class DatabaseStorage implements IStorage {
 
       // Update the raffle's soldTickets count
       await tx
-        .update(sqliteRaffles)
-        .set({ soldTickets: sql`${sqliteRaffles.soldTickets} + 1` })
-        .where(eq(sqliteRaffles.id, validatedTicket.raffleId));
+        .update(raffles)
+        .set({ soldTickets: sql`${raffles.soldTickets} + 1` })
+        .where(eq(raffles.id, validatedTicket.raffleId));
 
       return newTicket;
     });
@@ -363,37 +360,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTicketCount(raffleId: number): Promise<number> {
-    const [{ count }] = await sqliteDb
+    const [{ count }] = await db
       .select({ count: sql<number>`cast(count(*) as int)` })
-      .from(sqliteTickets)
-      .where(eq(sqliteTickets.raffleId, raffleId));
+      .from(tickets)
+      .where(eq(tickets.raffleId, raffleId));
     return count ?? 0;
   }
 
   // BTCPay Integration Methods
   async createPendingTicket(raffleId: number, userId: number): Promise<Ticket | null> {
-    const [ticket] = await sqliteDb
-      .insert(sqliteTickets)
+    const [ticket] = await db
+      .insert(tickets)
       .values({ raffleId, userId, status: 'pending' })
       .returning();
     return ticket ?? null;
   }
 
   async updateTicketInvoiceDetails(ticketId: number, btcpayInvoiceId: string, reservedAt: Date): Promise<Ticket | null> {
-    const [ticket] = await sqliteDb
-      .update(sqliteTickets)
+    const [ticket] = await db
+      .update(tickets)
       .set({ btcpayInvoiceId, reservedAt })
-      .where(eq(sqliteTickets.id, ticketId))
+      .where(eq(tickets.id, ticketId))
       .returning();
     return ticket ?? null;
   }
 
   async getTicketByInvoiceId(invoiceId: string): Promise<Ticket | null> {
     if (!invoiceId) return null;
-    const [ticket] = await sqliteDb
+    const [ticket] = await db
       .select()
-      .from(sqliteTickets)
-      .where(eq(sqliteTickets.btcpayInvoiceId, invoiceId))
+      .from(tickets)
+      .where(eq(tickets.btcpayInvoiceId, invoiceId))
       .limit(1);
     return ticket ?? null;
   }
@@ -403,18 +400,18 @@ export class DatabaseStorage implements IStorage {
     if (status === 'paid') {
       updateData.purchasedAt = new Date();
     }
-    const [ticket] = await sqliteDb
-      .update(sqliteTickets)
+    const [ticket] = await db
+      .update(tickets)
       .set(updateData)
-      .where(eq(sqliteTickets.id, ticketId))
+      .where(eq(tickets.id, ticketId))
       .returning();
 
     if (ticket && status === 'paid') {
       // Only increment soldTickets if the ticket is marked as paid
-      await sqliteDb
-        .update(sqliteRaffles)
-        .set({ soldTickets: sql`${sqliteRaffles.soldTickets} + 1` })
-        .where(eq(sqliteRaffles.id, ticket.raffleId));
+      await db
+        .update(raffles)
+        .set({ soldTickets: sql`${raffles.soldTickets} + 1` })
+        .where(eq(raffles.id, ticket.raffleId));
     }
 
     return ticket ?? null;
@@ -423,29 +420,29 @@ export class DatabaseStorage implements IStorage {
 
   // Winner methods
   async getWinner(id: number): Promise<Winner | undefined> {
-    const [winner] = await sqliteDb.select().from(sqliteWinners).where(eq(sqliteWinners.id, id)).limit(1);
+    const [winner] = await db.select().from(winners).where(eq(winners.id, id)).limit(1);
     return winner ?? undefined;
   }
 
   async getWinners(): Promise<Winner[]> {
-    const winnersList = await sqliteDb.select().from(sqliteWinners);
+    const winnersList = await db.select().from(winners);
     return winnersList;
   }
 
   async getWinnerByRaffle(raffleId: number): Promise<Winner | undefined> {
-    const [winner] = await sqliteDb.select().from(sqliteWinners).where(eq(sqliteWinners.raffleId, raffleId)).limit(1);
+    const [winner] = await db.select().from(winners).where(eq(winners.raffleId, raffleId)).limit(1);
     return winner ?? undefined;
   }
 
   async getWinnersByUser(userId: number): Promise<Winner[]> {
-    const winnersList = await sqliteDb.select().from(sqliteWinners).where(eq(sqliteWinners.userId, userId));
+    const winnersList = await db.select().from(winners).where(eq(winners.userId, userId));
     return winnersList;
   }
 
   async createWinner(insertWinner: InsertWinner): Promise<Winner> {
     const validatedWinner = insertWinnerSchema.parse(insertWinner);
-    const [winner] = await sqliteDb
-      .insert(sqliteWinners)
+    const [winner] = await db
+      .insert(winners)
       .values(validatedWinner)
       .returning();
     if (!winner) throw new Error('Failed to create winner');
@@ -453,10 +450,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateWinner(id: number, winnerUpdate: Partial<Winner>): Promise<Winner | undefined> {
-    const [updatedWinner] = await sqliteDb
-      .update(sqliteWinners)
+    const [updatedWinner] = await db
+      .update(winners)
       .set(winnerUpdate)
-      .where(eq(sqliteWinners.id, id))
+      .where(eq(winners.id, id))
       .returning();
     return updatedWinner ?? undefined;
   }
@@ -472,10 +469,10 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Get all paid tickets for the raffle - Explicit type annotation
-    const paidTickets: Ticket[] = await sqliteDb // Use base db instance, transaction context isn't strictly needed here unless reads need to be consistent with writes in endRaffle tx
+    const paidTickets: Ticket[] = await db // Use base db instance, transaction context isn't strictly needed here unless reads need to be consistent with writes in endRaffle tx
       .select()
-      .from(sqliteTickets)
-      .where(and(eq(sqliteTickets.raffleId, raffleId), eq(sqliteTickets.status, 'paid')));
+      .from(tickets)
+      .where(and(eq(tickets.raffleId, raffleId), eq(tickets.status, 'paid')));
 
     if (paidTickets.length === 0) {
       console.warn(`No paid tickets found for raffle ${raffleId}. Cannot select a winner.`);
@@ -495,8 +492,8 @@ export class DatabaseStorage implements IStorage {
     // REMOVED the transaction here as endRaffle now handles the overall transaction.
     // If selectWinner needs to perform writes AND be called outside endRaffle, it would need its own transaction handling.
     // For use within endRaffle, we rely on the outer transaction.
-    const [newWinner]: Winner[] = await sqliteDb // Use base db instance, will be part of the transaction if called within one.
-        .insert(sqliteWinners)
+    const [newWinner]: Winner[] = await db // Use base db instance, will be part of the transaction if called within one.
+        .insert(winners)
         .values({
           userId: winningTicket.userId,
           raffleId: raffleId,
