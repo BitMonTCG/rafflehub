@@ -24,5 +24,20 @@ export default defineConfig({
   },
   server: {
     hmr: false,
+    proxy: {
+      // Forward requests for /admin-login to the backend server
+      // PLEASE REPLACE 'http://localhost:3000' with your actual backend server URL
+      '/admin-login': {
+        target: 'http://localhost:3000', // Example: your backend server
+        changeOrigin: true, // Recommended for virtual hosted sites
+        // secure: false, // Uncomment if your backend is on HTTPS with a self-signed cert
+      },
+      // If you have other API endpoints, you might want a more general rule:
+      // '/api': {
+      //   target: 'http://localhost:3000', // Example: your backend server
+      //   changeOrigin: true,
+      //   rewrite: (path) => path.replace(/^\/api/, ''), // if your backend doesn't expect /api
+      // },
+    },
   },
 });

@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server/index.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist",
+        "buildCommand": "npm run build"
+      }
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/((?!api/|assets/|images/|css/|js/|favicon\\.ico|manifest\\.json|robots\\.txt|sw\\.js|index\\.html|_next/|static/).*)",
+      "destination": "/server/index.ts"
+    }
+  ]
+}

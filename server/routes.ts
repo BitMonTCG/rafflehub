@@ -718,6 +718,14 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
           currentUser.email // Now properly handled in the function
         );
 
+        // Check if BTCPay invoice ID exists and is a string
+        if (typeof btcpayInvoice.id !== 'string' || !btcpayInvoice.id.trim()) {
+          log('Error: BTCPay invoice ID is missing, not a string, or empty.', 'btcpayInvoice.id: ' + String(btcpayInvoice.id));
+          // It's crucial to not proceed if we don't have a valid invoice ID
+          // as this would lead to an orphaned ticket or incorrect data.
+          return res.status(500).json({ error: 'Failed to create payment invoice. Missing invoice ID from payment provider.' });
+        }
+
         // 4. Update the pending ticket with the invoice ID
         await storageInstance.updateTicketInvoiceDetails(
           pendingTicket.id,
