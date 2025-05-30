@@ -29,7 +29,7 @@ export function useClaimPrize() {
   
   return useMutation({
     mutationFn: async (winnerId: number) => {
-      const res = await apiRequest('PATCH', `/api/winners/${winnerId}`, { claimed: true });
+      const res = await apiRequest(`/api/winners/${winnerId}`, { method: 'PATCH', body: { claimed: true } });
       return res.json();
     },
     onSuccess: (_, variables) => {
@@ -38,7 +38,7 @@ export function useClaimPrize() {
         description: 'Congratulations! You have claimed your prize.',
       });
       // Invalidate specific winner query and all winners
-      queryClient.invalidateQueries({ queryKey: ['/api/winners', variables] });
+      // queryClient.invalidateQueries({ queryKey: ['/api/winners', variables] });
       queryClient.invalidateQueries({ queryKey: ['/api/winners'] });
     },
     onError: (error) => {
