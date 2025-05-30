@@ -1,10 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { storage } from "./storage";
+import { registerRoutes } from "./routes.js";
+import { setupVite, serveStatic, log } from "./vite.js";
+import { storage } from "./storage.js";
 import type { IStorage } from "./storage";
-import { checkInitializationStatus } from "./btcpayDirectService";
+import { checkInitializationStatus } from "./btcpayDirectService.js";
 
 // Prevent unhandled exceptions (especially from HMR WebSocket) from crashing the process
 process.on('uncaughtException', (err) => {
