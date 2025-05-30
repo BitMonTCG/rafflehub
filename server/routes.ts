@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { storage, IStorage } from "./storage";
-import { users, insertUserSchema, raffles, insertRaffleSchema, tickets, insertTicketSchema, winners, insertWinnerSchema, User, Winner, Raffle, Ticket, InsertUser } from "../shared/schema";
+import { storage, IStorage } from "./storage.js";
+import { users, insertUserSchema, raffles, insertRaffleSchema, tickets, insertTicketSchema, winners, insertWinnerSchema, User, Winner, Raffle, Ticket, InsertUser } from "../shared/schema.js";
 import { z, ZodError } from "zod";
 import express, { NextFunction } from "express";
 import passport from "passport";
@@ -11,10 +11,10 @@ import session from "express-session";
 import connectPgSimple from 'connect-pg-simple';
 import MemoryStore from 'memorystore';
 import bcrypt from 'bcrypt'; // Add bcrypt import
-import { log } from "./vite";
+import { log } from "./vite.js";
 import { eq, sql } from 'drizzle-orm';
 import { fromZodError } from 'zod-validation-error';
-import * as btcpayService from './btcpayService';
+import * as btcpayService from './btcpayService.js';
 import { InvoiceStatus } from 'btcpay-greenfield-node-client';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
