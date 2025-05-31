@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import request from 'supertest';
-import express from 'express';
+import express, { type Express } from 'express';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
-import { MemStorage } from '../../server/storage';
-import { setupRoutes } from '../../server/routes';
+import { MemStorage } from '../../server/storage.js';
+import { registerRoutes } from '../../server/routes.js';
+import { Server } from 'http';
 
 // Mock the BTCPay service
 vi.mock('../../server/btcpayService', () => ({
@@ -21,7 +22,8 @@ vi.mock('../../server/emailService', () => ({
 }));
 
 describe('Raffle API Integration Tests', () => {
-  let app: express.Application;
+  let app: Express;
+  let server: Server;
   let storage: MemStorage;
   let agent: any;
   let testUser: any;
@@ -30,6 +32,7 @@ describe('Raffle API Integration Tests', () => {
   beforeAll(async () => {
     // Create Express app
     app = express();
+    server = new Server(app);
     
     // Setup middleware
     app.use(express.json());
@@ -44,7 +47,7 @@ describe('Raffle API Integration Tests', () => {
     storage = new MemStorage();
     
     // Setup routes
-    setupRoutes(app, storage);
+    server = await registerRoutes(app, storage);
     
     // Create test users
     const hashedPassword = await bcrypt.hash('password123', 10);
@@ -73,6 +76,11 @@ describe('Raffle API Integration Tests', () => {
   
   afterAll(() => {
     // Cleanup
+    return new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
   });
   
   describe('GET /api/raffles', () => {

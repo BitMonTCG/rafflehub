@@ -6,7 +6,7 @@ import {
 } from 'btcpay-greenfield-node-client';
 import crypto from 'crypto';
 import { log } from './vite.js';
-import { btcpayConfig } from '../config/btcpay'; // Import configured storeId and webhookSecret
+import { btcpayConfig } from '../config/btcpay.js'; // Import configured storeId and webhookSecret
 
 // Constants
 const TICKET_PRICE_USD = 1.00; // Assuming $1 per ticket

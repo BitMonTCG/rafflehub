@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite.js";
 import { storage } from "./storage.js";
-import type { IStorage } from "./storage";
+import type { IStorage } from "./storage.js";
 import { checkInitializationStatus } from "./btcpayDirectService.js";
 
 // Prevent unhandled exceptions (especially from HMR WebSocket) from crashing the process

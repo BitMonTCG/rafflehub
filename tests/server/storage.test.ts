@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MemStorage } from '../../server/storage';
-import { InsertRaffle, InsertTicket, InsertUser } from '@shared/schema';
+import { MemStorage } from '../../server/storage.js';
+import { InsertRaffle, InsertTicket, InsertUser } from '../../shared/schema.js';
 
 // Mock the emailService
 vi.mock('../../server/emailService', () => ({

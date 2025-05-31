@@ -1,8 +1,8 @@
 // Removed ts-nocheck to enable proper type checking
 
-import { db, users, raffles, tickets, winners, insertUserSchema, insertRaffleSchema, insertTicketSchema, insertWinnerSchema } from "./db";
+import { db, users, raffles, tickets, winners, insertUserSchema, insertRaffleSchema, insertTicketSchema, insertWinnerSchema } from "./db.js";
 import { eq, and, desc, sql, gt } from "drizzle-orm";
-import { IStorage } from "./storage";
+import { IStorage } from "./storage.js";
 import type {
   User,
   InsertUser,
@@ -12,7 +12,7 @@ import type {
   InsertTicket,
   Winner,
   InsertWinner,
-} from "@shared/schema"; // Keep these type imports if they are distinct and necessary
+} from "../shared/schema.js"; // Keep these type imports if they are distinct and necessary
 import type { PostgresJsDatabase, PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
