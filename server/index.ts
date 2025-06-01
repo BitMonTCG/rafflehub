@@ -1,17 +1,17 @@
 import express, { type Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import { registerRoutes } from "./routes.js";
-import { setupVite, serveStatic, log } from "./vite.js";
+import { setupVite, serveStatic } from "./vite.js";
 import { storage } from "./storage.js";
 import type { IStorage } from "./storage.js";
 import { checkInitializationStatus } from "./btcpayDirectService.js";
 
 // Prevent unhandled exceptions (especially from HMR WebSocket) from crashing the process
 process.on('uncaughtException', (err) => {
-  log(`Uncaught exception: ${err.message}`, 'process');
+  console.error(`Uncaught exception: ${err.message}`, 'process');
 });
 process.on('unhandledRejection', (reason) => {
-  log(`Unhandled Rejection: ${reason}`, 'process');
+  console.error(`Unhandled Rejection: ${reason}`, 'process');
 });
 
 // Load environment variables from .env file
@@ -45,8 +45,7 @@ app.use((req, res, next) => {
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "…";
       }
-
-      log(logLine);
+      console.log(logLine);
     }
   });
 
@@ -56,24 +55,24 @@ app.use((req, res, next) => {
 (async () => {
   try {
     // Initialize database with sample data
-    log("Initializing database and sample data...");
+    console.log("Initializing database and sample data...");
     try {
       // await storage.initializeData(); // Commented out to prevent seeding
-      log("Database initialization skipped.");
+      console.log("Database initialization skipped.");
       // log("Database and sample data initialized (if needed).");
     } catch (initError) {
-      log(`Error initializing database: ${initError}`);
+      console.error(`Error initializing database: ${initError}`);
     }
     
     // Check BTCPay Service status (keys loaded/generated, verification attempted)
     // Note: Actual pairing requires user interaction via the pairing URL
-    log("Checking BTCPay Service status...");
+    console.log("Checking BTCPay Service status...");
     const isBtcPayReady = await checkInitializationStatus();
     if (isBtcPayReady) {
-       log("BTCPay Service is Initialized (API connection verified, Store ID obtained).");
+       console.log("BTCPay Service is Initialized (API connection verified, Store ID obtained).");
     } else {
-       log("BTCPay Service is NOT fully initialized. Pairing may be required or API check failed.");
-       log("Please use the pairing endpoint if necessary.");
+       console.warn("BTCPay Service is NOT fully initialized. Pairing may be required or API check failed.");
+       console.warn("Please use the pairing endpoint if necessary.");
     }
     
     const server = await registerRoutes(app, storage as IStorage);
@@ -81,14 +80,15 @@ app.use((req, res, next) => {
     // Add WebSocket error handling to prevent crashes
     server.on('upgrade', (request, socket, head) => {
       socket.on('error', (err) => {
-        log(`WebSocket error: ${err.message}`);
-        // Don't close the socket, just log the error
+        console.error(`WebSocket error: ${err.message}`);
       });
     });
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
+
+      console.error(`Global Error Handler: [${status}] ${message}`, err.stack ? { stack: err.stack } : { error: err });
 
       res.status(status).json({ message });
       // It's often better not to re-throw the error here unless you have a top-level handler
@@ -113,10 +113,10 @@ app.use((req, res, next) => {
       host: "0.0.0.0",
       reusePort: true,
     }, () => {
-      log(`serving on port ${port}`);
+      console.log(`serving on port ${port}`);
     });
   } catch (error) {
-    log(`Error starting server: ${error}`);
+    console.error(`Error starting server: ${error}`);
     process.exit(1);
   }
 })();

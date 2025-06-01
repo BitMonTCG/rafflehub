@@ -1,29 +1,17 @@
 import nodemailer from 'nodemailer';
-import { log } from './vite.js';
+// import { log } from './vite.js'; // Removed as vite.js doesn't exist or log methods are incorrect
+import { TransportOptions } from 'nodemailer';
 
-interface EmailConfig {
-  host: string;
-  port: number;
-  secure: boolean;
+// Create a transporter object using SMTP transport
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST || 'your_email_host', // Placeholder
+  port: process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT, 10) : 587, // Placeholder
+  secure: process.env.EMAIL_SECURE === 'true', // Placeholder, defaults to false (true for 465, false for other ports)
   auth: {
-    user: string;
-    pass: string;
-  };
-}
-
-// Email configuration
-const emailConfig: EmailConfig = {
-  host: process.env.EMAIL_HOST || 'smtp.example.com',
-  port: parseInt(process.env.EMAIL_PORT || '587'),
-  secure: process.env.EMAIL_SECURE === 'true',
-  auth: {
-    user: process.env.EMAIL_USER || '',
-    pass: process.env.EMAIL_PASSWORD || '',
+    user: process.env.EMAIL_USER || 'your_email_user', // Placeholder
+    pass: process.env.EMAIL_PASSWORD || 'your_email_password', // Placeholder
   },
-};
-
-// Create transporter
-const transporter = nodemailer.createTransport(emailConfig);
+} as TransportOptions);
 
 /**
  * Send an email
@@ -41,9 +29,9 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
       html,
     });
     
-    log(`Email sent: ${info.messageId}`);
+    // log(`Email sent: ${info.messageId}`);
   } catch (error) {
-    log(`Error sending email: ${error instanceof Error ? error.message : String(error)}`);
+    // log(`Error sending email: ${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
 }
@@ -59,7 +47,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
  * @param raffleId ID of the raffle for generating links
  * @returns Promise that resolves when email is sent
  */
-export async function sendWinnerNotification(
+export const sendWinnerNotification = async (
   userEmail: string,
   username: string,
   raffleTitle: string,
@@ -67,7 +55,20 @@ export async function sendWinnerNotification(
   retailPrice: number,
   winnerPrice: number,
   raffleId: number
-): Promise<void> {
+): Promise<void> => {
+  // Fallback to console.log if critical email variables are placeholders or EMAIL_FROM is missing
+  if (
+    process.env.EMAIL_HOST === 'your_email_host' ||
+    process.env.EMAIL_USER === 'your_email_user' ||
+    process.env.EMAIL_PASSWORD === 'your_email_password' ||
+    !process.env.EMAIL_FROM || process.env.EMAIL_FROM === '"Rafflehub" <noreply@example.com>'
+  ) {
+    console.log(
+      `Skipping email notification due to placeholder or missing email config. Winner: ${userEmail}, Raffle: ${raffleTitle}, Prize: ${cardName}, RaffleID: ${raffleId}`
+    );
+    return;
+  }
+
   const subject = `🎉 Congratulations! You've Won the ${cardName} Raffle!`;
   
   // Calculate discount percentage
@@ -113,5 +114,20 @@ export async function sendWinnerNotification(
     </div>
   `;
   
-  return sendEmail(userEmail, subject, html);
-} 
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || '"Rafflehub" <noreply@example.com>', // Sender address (EMAIL_FROM placeholder)
+    to: userEmail, // List of receivers
+    subject: subject, // Subject line
+    html: html, // HTML body content
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    // log.info(`Winner notification email sent to ${userEmail} for raffle ${raffleId}`);
+    console.info(`Winner notification email sent to ${userEmail} for raffle ${raffleId}`);
+  } catch (error) {
+    // log.error(`Error sending winner notification email to ${userEmail}:`, error);
+    console.error(`Error sending winner notification email to ${userEmail}:`, error);
+    // Do not re-throw, allow the process to continue if email fails
+  }
+}; 

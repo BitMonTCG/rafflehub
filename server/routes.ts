@@ -11,7 +11,6 @@ import session from "express-session";
 import connectPgSimple from 'connect-pg-simple';
 import MemoryStore from 'memorystore';
 import bcrypt from 'bcrypt'; // Add bcrypt import
-import { log } from "./vite.js";
 import { eq, sql } from 'drizzle-orm';
 import { fromZodError } from 'zod-validation-error';
 import * as btcpayService from './btcpayService.js';
@@ -19,6 +18,7 @@ import { InvoiceStatus } from 'btcpay-greenfield-node-client';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import helmet from 'helmet';
+import csurf from 'csurf'; // Import csurf
 
 // Define a simple interface for the expected webhook payload structure
 interface BtcPayWebhookPayload {
@@ -54,7 +54,7 @@ let wss: WebSocketServer | null = null;
 
 function broadcast(message: any) {
   if (!wss) {
-    log("WebSocket server not initialized, cannot broadcast.");
+    console.log("WebSocket server not initialized, cannot broadcast.");
     return;
   }
   const messageStr = JSON.stringify(message);
@@ -63,7 +63,7 @@ function broadcast(message: any) {
       try {
          client.send(messageStr);
       } catch (err) {
-         log(`Error sending WebSocket message: ${err}`);
+         console.log(`Error sending WebSocket message: ${err}`);
       }
     }
   });
@@ -77,27 +77,27 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   wss = new WebSocketServer({ server: httpServer }); 
   
   wss.on('connection', (ws) => {
-    log('Client connected via WebSocket');
+    console.log('Client connected via WebSocket');
     // clients.add(ws); // Manage clients if needed for targeted messages
     
     ws.on('message', async (message) => {
-       log(`Received WebSocket message: ${message}`);
+       console.log(`Received WebSocket message: ${message}`);
        try {
          const data = JSON.parse(message.toString());
          if (data.type === 'PING') {
            ws.send(JSON.stringify({ type: 'PONG' }));
          }
        } catch (error) {
-         log(`Error processing WebSocket message: ${error}`);
+         console.log(`Error processing WebSocket message: ${error}`);
        }
     });
     
     ws.on('close', () => {
-      log('Client disconnected from WebSocket');
+      console.log('Client disconnected from WebSocket');
       // clients.delete(ws);
     });
     ws.on('error', (error) => {
-      log(`WebSocket error: ${error}`);
+      console.log(`WebSocket error: ${error}`);
       // clients.delete(ws);
     });
   });
@@ -147,93 +147,177 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     });
   }
   
-  app.post('/api/btcpay/webhook', express.raw({ type: 'application/json' }));
-  
-  app.use(express.json());
+  // --- Middleware Order is Important --- 
 
-  // Generate a secure session secret if not provided in environment variables
-  const sessionSecret = process.env.SESSION_SECRET || 
-    (() => {
-      const secret = crypto.randomBytes(32).toString('hex');
+  // 1. Special route middleware (like raw body parser for webhooks)
+  // BTCPay Webhook - uses raw body, so define before express.json() and CSRF
+  app.post('/api/btcpay/webhook', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
+    const signature = req.headers['btcpay-sig'] as string | undefined;
+    const requestBody = req.body;
+
+    if (!Buffer.isBuffer(requestBody)) {
+        // Using console.error as 'log' might be undefined or incorrect
+        console.error('Webhook Error: Request body is not a Buffer. Check middleware order.');
+        return res.status(400).send('Invalid request body type.');
+    }
+    if (!signature) { 
+      console.error('Webhook Error: Missing btcpay-sig header');
+      return res.status(400).send('Missing BTCPay Signature header');
+    } 
+    if (!btcpayService.verifyWebhookSignature(requestBody, signature)) { 
+      console.error('Webhook Error: Invalid signature');
+      return res.status(400).send('Invalid BTCPay Signature');
+    }
+    try {
+      const event: BtcPayWebhookPayload = JSON.parse(requestBody.toString());
+      console.log(`Received verified BTCPay webhook event: Type=${event.type}, InvoiceId=${event.invoiceId}`);
+      const invoiceId = event.invoiceId;
+      if (!invoiceId) {
+          console.error('Webhook Error: Invoice ID missing in payload.');
+          return res.status(400).send('Missing invoiceId');
+      }
+      const ticket = await storageInstance.getTicketByInvoiceId(invoiceId);
+      if (!ticket) {
+        console.warn(`Webhook Warning: Received event for unknown invoice ID ${invoiceId}. Ignoring.`);
+        return res.status(200).send('Webhook received for unknown invoice.');
+      }
+      console.log(`Processing webhook for ticket ${ticket.id} (Invoice ${invoiceId}, Current Status: ${ticket.status})`);
+      let updatePerformed = false;
+      switch (event.type) {
+          case 'InvoiceSettled':
+            if (ticket.status === 'pending') {
+              console.log(`Updating ticket ${ticket.id} to paid (Invoice Settled)`);
+              await storageInstance.updateTicketStatus(ticket.id, 'paid');
+              updatePerformed = true;
+              broadcast({ type: 'TICKET_PAID', ticketId: ticket.id, raffleId: ticket.raffleId });
+               const updatedRaffle = await storageInstance.getRaffle(ticket.raffleId);
+               if (updatedRaffle) {
+                 broadcast({ type: 'RAFFLE_UPDATED', raffle: updatedRaffle });
+               }
+            } else {
+              console.log(`Webhook Info: Invoice ${invoiceId} settled, but ticket ${ticket.id} was already ${ticket.status}. Ignoring.`);
+            }
+            break;
+          case 'InvoiceExpired':
+          case 'InvoiceInvalid':
+             if (ticket.status === 'pending') {
+                 console.log(`Updating ticket ${ticket.id} to expired (Invoice ${event.type})`);
+                 await storageInstance.updateTicketStatus(ticket.id, 'expired');
+                 updatePerformed = true;
+                 broadcast({ type: 'TICKET_EXPIRED', ticketId: ticket.id, raffleId: ticket.raffleId });
+             } else {
+                 console.log(`Webhook Info: Invoice ${invoiceId} ${event.type}, but ticket ${ticket.id} was already ${ticket.status}. Ignoring.`);
+             }
+             break;
+          case 'InvoiceProcessing':
+             console.log(`Webhook Info: Invoice ${invoiceId} is processing for ticket ${ticket.id}. Status remains '${ticket.status}'.`);
+             break;
+          default:
+            console.log(`Webhook Info: Received unhandled event type: ${event.type} for invoice ${invoiceId}`);
+            break;
+        }
+      res.status(200).send('Webhook processed successfully');
+    } catch (error) {
+      console.error(`Webhook Error: Failed to parse or process webhook payload: ${error}`);
+      res.status(500).send('Error processing webhook');
+    }
+  });
+
+  // 2. Global middlewares (body parsers, session, passport, CSRF)
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: false })); // Add urlencoded parser for form submissions if any
+
+  // Session setup (ensure sessionSecret is defined)
+  const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+  if (process.env.SESSION_SECRET !== sessionSecret) {
       console.log('WARNING: Using auto-generated session secret. Set SESSION_SECRET env var for persistent sessions.');
-      return secret;
-    })();
-    
+  }
   app.use(session({
     store: sessionStore,
     secret: sessionSecret,
-    resave: true,  // Changed to true to ensure session is saved on each request
+    resave: true, 
     saveUninitialized: false,
     cookie: {
-      // Use secure cookies in production, non-secure in development
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      // In production, we want 'none' for cross-site cookies to work with Vercel deployment
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-      // Set domain for production if needed
-      // domain: process.env.NODE_ENV === 'production' ? '.yourdomain.com' : undefined,
     },
-    name: 'bitmon_sid', // Custom session name (not the default 'connect.sid')
+    name: 'bitmon_sid',
   }));
 
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Configure Passport Local Strategy for authentication
+  // CSRF Protection
+  const csrfProtectionOptions = { 
+    cookie: true,
+    // ignoreMethods: ['GET', 'HEAD', 'OPTIONS'], // csurf default ignores these already
+  };
+  const csrf = csurf(csrfProtectionOptions);
+
+  app.use((req, res, next) => {
+    if (req.path === '/api/btcpay/webhook') { // Already handled above, so CSRF is skipped
+      return next();
+    }
+    // Apply CSRF to all other routes that are not GET, HEAD, OPTIONS by default
+    csrf(req, res, next);
+  });
+  
+  // Route to get CSRF token for client-side use
+  app.get('/api/csrf-token', (req: Request, res: Response) => {
+    // req.csrfToken() is added by csurf middleware
+    if (typeof (req as any).csrfToken === 'function') {
+      res.json({ csrfToken: (req as any).csrfToken() });
+    } else {
+      console.error('CSRF token function not available on request object for /api/csrf-token');
+      res.status(500).json({ message: 'CSRF token service not available.' });
+    }
+  });
+  
+  // CSRF Error Handler (must be after CSRF middleware and before other error handlers)
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+      console.warn(`CSRF token validation failed for ${req.method} ${req.path}:`, err.message);
+      res.status(403).json({ message: 'Invalid or missing CSRF token. Please refresh and try again.' });
+    } else {
+      next(err);
+    }
+  });
+
+  // 3. Passport Strategy Configurations (moved here for clarity, needs storageInstance)
   // Strategy for regular database users
   passport.use('user-local', new LocalStrategy(async (username, password, done) => {
+      // ... (existing user-local strategy logic) ...
     try {
-      // Find user by username
       const user = await storageInstance.getUserByUsername(username);
-      
-      // If user not found, authentication fails
       if (!user) {
         return done(null, false, { message: 'Incorrect username.' });
       }
-      
-      // Check password using bcrypt
       const isMatch = await bcrypt.compare(password, user.password);
-      
-      // If password doesn't match, authentication fails
       if (!isMatch) {
         return done(null, false, { message: 'Incorrect password.' });
       }
-      
-      // Authentication successful, return user without password
       const { password: _, ...userWithoutPassword } = user;
       return done(null, userWithoutPassword);
     } catch (error) {
-      // Server error during authentication
       return done(error);
     }
   }));
 
   // Strategy for admin user from .env
   passport.use('admin-strategy', new LocalStrategy(
-    {
-      usernameField: 'username', // Ensure these match your form field names
-      passwordField: 'password'
-    },
+    { usernameField: 'username', passwordField: 'password' },
     (username, password, done) => {
+      // ... (existing admin-strategy logic) ...
       const adminUsername = process.env.ADMIN_USERNAME;
       const adminPassword = process.env.ADMIN_PASSWORD;
-
       if (!adminUsername || !adminPassword) {
-        log('Admin credentials are not set in environment variables.');
+        console.error('Admin credentials are not set in environment variables.');
         return done(null, false, { message: 'Admin configuration error.' });
       }
-
       if (username === adminUsername && password === adminPassword) {
-        // Create a user-like object for the admin
-        // IMPORTANT: Ensure this object structure is compatible with what passport.serializeUser expects
-        // and what your ensureAdmin middleware might expect (e.g., an 'id' and 'role' or 'isAdmin' property)
-        const adminUser = {
-          id: 'admin_user_id', // Static ID for the admin user session
-          username: adminUsername,
-          role: 'admin', // Add a role property
-          // Add any other properties your ensureAdmin or client-side might expect
-        };
+        const adminUser = { id: 'admin_user_id', username: adminUsername, role: 'admin' };
         return done(null, adminUser);
       } else {
         return done(null, false, { message: 'Incorrect admin username or password.' });
@@ -241,54 +325,31 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     }
   ));
 
-  // --- Passport Serialization/Deserialization --- 
-  // Store only the user ID in the session
+  // Passport Serialization/Deserialization
   passport.serializeUser((user: any, done) => {
-    // Assuming 'user' object has an 'id' property based on your User type
     done(null, user.id);
   });
-
-  // Retrieve the full user object from the database using the ID from the session
-  passport.deserializeUser(async (id: string | number, done) => { // Allow id to be string or number
+  passport.deserializeUser(async (id: string | number, done) => {
+    // ... (existing deserializeUser logic) ...
     try {
       if (id === 'admin_user_id') {
-      // Reconstruct the .env admin user object
       const adminUsername = process.env.ADMIN_USERNAME;
       if (!adminUsername) {
         console.error('ADMIN_USERNAME not set, cannot deserialize .env admin');
         return done(new Error('Admin configuration error'), null);
       }
-      const envAdminUser = { 
-        id: 'admin_user_id', 
-        username: adminUsername, 
-        role: 'admin' 
-      };
-      // console.log(`Env Admin deserialized from session: ID=${envAdminUser.id}, Username=${envAdminUser.username}, Role=${envAdminUser.role}`);
+      const envAdminUser = { id: 'admin_user_id', username: adminUsername, role: 'admin' };
       return done(null, envAdminUser);
     }
-
-    // Existing logic for numeric IDs (database users)
-    const numericId = typeof id === 'string' ? parseInt(id, 10) : id; // Ensure it's a number for DB lookup
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
     if (isNaN(numericId)) { 
         console.warn(`deserializeUser received non-numeric, non-admin ID: ${id}`);
         return done(null, null); 
     }
-
     const user = await storageInstance.getUserById(numericId);
-      
       if (user) {
-        // Ensure proper type conversion and remove password
-        const safeUser = {
-          ...user,
-          // Ensure isAdmin is properly converted to boolean (SQLite stores as 0/1)
-          isAdmin: user.isAdmin === true || user.isAdmin === 1,
-          // Remove password for security
-          password: ''
-        } as User; // Ensure TypeScript recognizes this as a User object
-        
-        // Log user details to help diagnose issues
+        const safeUser = { ...user, isAdmin: user.isAdmin === true || (user.isAdmin as any) === 1, password: '' } as User;
         console.log(`User deserialized from session: ID=${safeUser.id}, Username=${safeUser.username}, Admin=${safeUser.isAdmin}`);
-        
         done(null, safeUser);
       } else {
         done(null, null);
@@ -299,9 +360,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     }
   });
 
-  // --- Security Middleware ---
-  
-  // Rate limiting for authentication routes
+  // 4. Rate Limiters, Route-specific middleware, and API Routes
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 5, // 5 attempts per window per IP
@@ -310,9 +369,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   });
 
-  // --- API Routes ---
-
-  // Authentication routes
+  // Authentication routes (POST will be CSRF protected by middleware above)
   app.post('/api/login', loginLimiter, (req: Request, res: Response, next: NextFunction) => {
     passport.authenticate('user-local', (err: any, user: User | false, info: { message: string }) => {
       if (err) { return next(err); }
@@ -393,7 +450,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       // Generic error handling
       // Log the specific error message for better debugging
       const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Registration failed for ${req.body.username || 'unknown user'}: ${errorMessage}`); 
+      console.log(`Registration failed for ${req.body.username || 'unknown user'}: ${errorMessage}`); 
       // Also log the full error object if possible, for stack trace etc.
       console.error("Registration Error Object:", error); 
       
@@ -402,24 +459,23 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   });
 
   // Admin login route
-  app.post('/api/auth/admin/login', loginLimiter, (req, res, next) => { // Added loginLimiter here too
+  app.post('/api/auth/admin/login', loginLimiter, (req, res, next) => {
     passport.authenticate('admin-strategy', (err: any, adminUser: any | false, info: { message: string }) => {
       if (err) {
-        log(`Admin login error: ${err}`);
+        console.log(`Admin login error: ${err}`);
         return next(err);
       }
       if (!adminUser) {
-        log(`Admin login failed: ${info.message}`);
+        console.log(`Admin login failed: ${info.message}`);
         return res.status(401).json({ message: info.message || 'Admin login failed' });
       }
-      req.logIn(adminUser, (loginErr) => { // Changed err to loginErr to avoid conflict
+      req.logIn(adminUser, (loginErr) => {
         if (loginErr) {
-          log(`Admin session error after login: ${loginErr}`);
+          console.log(`Admin session error after login: ${loginErr}`);
           return next(loginErr);
         }
-        log(`Admin user ${adminUser.username} logged in successfully`);
-        // Send back a success message or the admin user object
-        return res.json({ message: 'Admin login successful', user: { username: adminUser.username, role: adminUser.role, id: adminUser.id } }); // Added id
+        console.log(`Admin user ${adminUser.username} logged in successfully`);
+        return res.json({ message: 'Admin login successful', user: { username: adminUser.username, role: adminUser.role, id: adminUser.id } });
       });
     })(req, res, next);
   });
@@ -429,7 +485,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       if (err) { return next(err); }
       req.session.destroy((destroyErr) => {
          if (destroyErr) {
-           log(`Error destroying session: ${destroyErr}`);
+           console.log(`Error destroying session: ${destroyErr}`);
          }
          const sessionCookieName = 'connect.sid'; 
          res.clearCookie(sessionCookieName); 
@@ -508,7 +564,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       const usersResponse = allUsers.map(({ password, ...user }: User) => user);
       res.status(200).json(usersResponse);
     } catch (error) {
-      log(`Error fetching users: ${error}`);
+      console.log(`Error fetching users: ${error}`);
       res.status(500).json({ message: "Error fetching users" });
     }
   });
@@ -520,7 +576,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       const rafflesList = await storageInstance.getRaffles(activeOnly); 
       res.status(200).json(rafflesList);
     } catch (error) {
-       log(`Error fetching raffles: ${error}`);
+       console.log(`Error fetching raffles: ${error}`);
       res.status(500).json({ message: "Error fetching raffles" });
     }
   });
@@ -530,7 +586,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       const featured = await storageInstance.getFeaturedRaffle();
       res.status(200).json(featured || null); // Return raffle or null
     } catch (error) {
-       log(`Error fetching featured raffle: ${error}`);
+       console.log(`Error fetching featured raffle: ${error}`);
       res.status(500).json({ message: "Error fetching featured raffle" });
     }
   });
@@ -548,7 +604,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
         res.status(404).json({ message: "Raffle not found" });
       }
     } catch (error) {
-       log(`Error fetching raffle ${req.params.id}: ${error}`);
+       console.log(`Error fetching raffle ${req.params.id}: ${error}`);
       res.status(500).json({ message: "Error fetching raffle" });
     }
   });
@@ -565,7 +621,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
        if (error instanceof ZodError) {
          return res.status(400).json({ message: fromZodError(error).message });
       }
-      log(`Error creating raffle: ${error}`);
+      console.log(`Error creating raffle: ${error}`);
       res.status(500).json({ message: "Error creating raffle" });
     }
   });
@@ -596,7 +652,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
        if (error instanceof ZodError) {
          return res.status(400).json({ message: fromZodError(error).message });
       }
-      log(`Error updating raffle ${req.params.id}: ${error}`);
+      console.log(`Error updating raffle ${req.params.id}: ${error}`);
       res.status(500).json({ message: "Error updating raffle" });
     }
   });
@@ -631,16 +687,16 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       // Send winner notification email
       try {
         const notificationSent = await storageInstance.notifyWinner(winner.id);
-        log(`Winner notification for raffle ${id}: ${notificationSent ? 'Sent successfully' : 'Failed to send'}`);
+        console.log(`Winner notification for raffle ${id}: ${notificationSent ? 'Sent successfully' : 'Failed to send'}`);
       } catch (notifyError) {
         // Log the error but continue - don't fail the API call just because notification failed
-        log(`Error sending winner notification for raffle ${id}: ${notifyError}`);
+        console.log(`Error sending winner notification for raffle ${id}: ${notifyError}`);
       }
       
       broadcast({ type: 'RAFFLE_ENDED', raffle: updatedRaffle, winner }); 
       res.status(200).json({ raffle: updatedRaffle, winner });
     } catch (error) {
-      log(`Error ending raffle ${req.params.id}: ${error}`);
+      console.log(`Error ending raffle ${req.params.id}: ${error}`);
       res.status(500).json({ message: `Error ending raffle: ${error instanceof Error ? error.message : error}` });
     }
   });
@@ -671,7 +727,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     }
   });
 
-  // --- Ticket routes ---
+  // Ticket routes
   app.post('/api/tickets', ensureAuthenticated, async (req: Request, res: Response) => {
     try {
       // Check if user is authenticated
@@ -703,10 +759,10 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
 
         // Add null check for pendingTicket
         if (!pendingTicket) {
-          log(`Failed to create pending ticket for raffle ${numericRaffleId}, user ${userId}. Possibly sold out or error.`);
+          console.log(`Failed to create pending ticket for raffle ${numericRaffleId}, user ${userId}. Possibly sold out or error.`);
           return res.status(400).json({ message: 'Could not reserve ticket. Raffle might be sold out or unavailable.' });
         }
-        log(`Pending ticket ${pendingTicket.id} created for user ${userId}, raffle ${numericRaffleId}`);
+        console.log(`Pending ticket ${pendingTicket.id} created for user ${userId}, raffle ${numericRaffleId}`);
 
         // 3. Create BTCPay Invoice, passing raffle details
         const btcpayInvoice = await btcpayService.createRaffleTicketInvoice(
@@ -720,7 +776,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
 
         // Check if BTCPay invoice ID exists and is a string
         if (typeof btcpayInvoice.id !== 'string' || !btcpayInvoice.id.trim()) {
-          log('Error: BTCPay invoice ID is missing, not a string, or empty.', 'btcpayInvoice.id: ' + String(btcpayInvoice.id));
+          console.log('Error: BTCPay invoice ID is missing, not a string, or empty.', 'btcpayInvoice.id: ' + String(btcpayInvoice.id));
           // It's crucial to not proceed if we don't have a valid invoice ID
           // as this would lead to an orphaned ticket or incorrect data.
           return res.status(500).json({ error: 'Failed to create payment invoice. Missing invoice ID from payment provider.' });
@@ -744,13 +800,13 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
         if (error instanceof ZodError) {
           return res.status(400).json({ message: fromZodError(error).message });
         }
-        log(`Error purchasing ticket: ${error}`);
+        console.log(`Error purchasing ticket: ${error}`);
         // If BTCPay creation failed after pending ticket was made, maybe clean up?
         // For now, just return a generic error.
         res.status(500).json({ message: 'Error processing ticket purchase' });
       }
     } catch (error) {
-      log(`Error purchasing ticket: ${error}`);
+      console.log(`Error purchasing ticket: ${error}`);
       res.status(500).json({ message: 'Error purchasing ticket' });
     }
   });
@@ -776,7 +832,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
        
        res.status(200).json(ticket);
     } catch (error) {
-       log(`Error fetching ticket ${req.params.id}: ${error}`);
+       console.log(`Error fetching ticket ${req.params.id}: ${error}`);
        res.status(500).json({ message: "Error fetching ticket" });
     }
   });
@@ -791,7 +847,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
        const ticketsList = await storageInstance.getTicketsByRaffle(raffleId);
        res.status(200).json(ticketsList);
      } catch (error) {
-       log(`Error fetching tickets for raffle ${req.params.raffleId}: ${error}`);
+       console.log(`Error fetching tickets for raffle ${req.params.raffleId}: ${error}`);
        res.status(500).json({ message: "Error fetching tickets" });
      }
   });
@@ -803,12 +859,12 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
        const ticketsList = await storageInstance.getTicketsByUser(user.id);
        res.status(200).json(ticketsList);
      } catch (error) {
-       log(`Error fetching tickets for user ${ (req.user as User).id }: ${error}`);
+       console.log(`Error fetching tickets for user ${ (req.user as User).id }: ${error}`);
        res.status(500).json({ message: "Error fetching user tickets" });
      }
   });
 
-  // --- Winner routes ---
+  // Winner routes
   app.get('/api/winners', async (req: Request, res: Response) => {
     try {
       const winnersList = await storageInstance.getWinners();
@@ -818,117 +874,12 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       }));
       res.status(200).json(publicWinners);
     } catch (error) {
-      log(`Error fetching winners: ${error}`);
+      console.log(`Error fetching winners: ${error}`);
       res.status(500).json({ message: "Error fetching winners" });
     }
   });
   
-  // --- BTCPay Webhook Route ---
-  app.post('/api/btcpay/webhook', async (req: Request, res: Response) => {
-    const signature = req.headers['btcpay-sig'] as string | undefined;
-    const requestBody = req.body;
-
-    if (!Buffer.isBuffer(requestBody)) {
-        log('Webhook Error: Request body is not a Buffer. Check middleware order.');
-        return res.status(400).send('Invalid request body type.');
-    }
-
-    // 1. Verify Signature
-    if (!signature) { // Check if signature exists first
-      log('Webhook Error: Missing btcpay-sig header');
-      return res.status(400).send('Missing BTCPay Signature header');
-    } 
-    // If we reach here, signature is a string.
-    if (!btcpayService.verifyWebhookSignature(requestBody, signature)) { 
-      log('Webhook Error: Invalid signature');
-      return res.status(400).send('Invalid BTCPay Signature');
-    }
-
-    // 2. Process Verified Webhook
-    try {
-      // Use the local interface for the parsed payload
-      const event: BtcPayWebhookPayload = JSON.parse(requestBody.toString());
-      log(`Received verified BTCPay webhook event: Type=${event.type}, InvoiceId=${event.invoiceId}`);
-
-      const invoiceId = event.invoiceId;
-      if (!invoiceId) {
-          log('Webhook Error: Invoice ID missing in payload.');
-          return res.status(400).send('Missing invoiceId'); // Bad request payload
-      }
-
-      // 3. Find corresponding ticket (implement getTicketByInvoiceId in storage)
-      const ticket = await storageInstance.getTicketByInvoiceId(invoiceId);
-
-      if (!ticket) {
-        log(`Webhook Warning: Received event for unknown invoice ID ${invoiceId}. Ignoring.`);
-        // Return 200 OK to BTCPay even if we don't know the invoice, 
-        // prevents unnecessary retries for potentially old/mismatched webhooks.
-        return res.status(200).send('Webhook received for unknown invoice.');
-      }
-
-      log(`Processing webhook for ticket ${ticket.id} (Invoice ${invoiceId}, Current Status: ${ticket.status})`);
-
-      // 4. Update ticket status based on event type
-      let updatePerformed = false;
-      try {
-        switch (event.type) {
-          case 'InvoiceSettled':
-            if (ticket.status === 'pending') {
-              log(`Updating ticket ${ticket.id} to paid (Invoice Settled)`);
-              await storageInstance.updateTicketStatus(ticket.id, 'paid');
-              updatePerformed = true;
-              // Broadcast update to clients
-              broadcast({ type: 'TICKET_PAID', ticketId: ticket.id, raffleId: ticket.raffleId });
-              // Also broadcast raffle update (sold count)
-               const updatedRaffle = await storageInstance.getRaffle(ticket.raffleId);
-               if (updatedRaffle) {
-                 broadcast({ type: 'RAFFLE_UPDATED', raffle: updatedRaffle });
-               }
-            } else {
-              log(`Webhook Info: Invoice ${invoiceId} settled, but ticket ${ticket.id} was already ${ticket.status}. Ignoring.`);
-            }
-            break;
-          
-          case 'InvoiceExpired':
-          case 'InvoiceInvalid':
-             if (ticket.status === 'pending') {
-                 log(`Updating ticket ${ticket.id} to expired (Invoice ${event.type})`);
-                 await storageInstance.updateTicketStatus(ticket.id, 'expired');
-                 updatePerformed = true;
-                 // Broadcast update to clients (optional)
-                 broadcast({ type: 'TICKET_EXPIRED', ticketId: ticket.id, raffleId: ticket.raffleId });
-             } else {
-                 log(`Webhook Info: Invoice ${invoiceId} ${event.type}, but ticket ${ticket.id} was already ${ticket.status}. Ignoring.`);
-             }
-             break;
-             
-          case 'InvoiceProcessing':
-             // Optional: Update status to 'processing' or just log
-             log(`Webhook Info: Invoice ${invoiceId} is processing for ticket ${ticket.id}. Status remains '${ticket.status}'.`);
-             // Could potentially update status to 'processing' if you add that state
-             // await storageInstance.updateTicketStatus(ticket.id, 'processing');
-             break;
-
-          default:
-            log(`Webhook Info: Received unhandled event type: ${event.type} for invoice ${invoiceId}`);
-            break;
-        }
-      } catch (dbError) {
-         log(`Webhook Error: Failed to update ticket ${ticket.id} status in DB: ${dbError}`);
-         // Return 500 to indicate internal error, BTCPay might retry
-         return res.status(500).send('Internal server error processing webhook.');
-      }
-      
-      // 5. Acknowledge Webhook
-      res.status(200).send('Webhook processed successfully');
-
-    } catch (error) {
-      log(`Webhook Error: Failed to parse or process webhook payload: ${error}`);
-      res.status(500).send('Error processing webhook');
-    }
-  });
-  
-  // --- Stats routes ---
+  // Stats routes
   app.get('/api/stats', async (req, res) => {
        try {
         const allRaffles = await storageInstance.getRaffles(false);
@@ -958,7 +909,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
           totalPrizesClaimedValue
         });
       } catch (error) {
-        log(`Error fetching stats: ${error}`);
+        console.log(`Error fetching stats: ${error}`);
         res.status(500).json({ message: "Error fetching statistics" });
       } 
     });

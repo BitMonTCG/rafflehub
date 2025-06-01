@@ -2,8 +2,8 @@ import dotenv from 'dotenv';
 dotenv.config(); // Ensure .env variables are loaded before reading them
 
 import { OpenAPI } from 'btcpay-greenfield-node-client';
-import fs from 'fs';
-import path from 'path';
+// import fs from 'fs'; // No longer needed
+// import path from 'path'; // No longer needed
 
 /**
  * Loads and validates BTCPay configuration from environment variables.
@@ -11,38 +11,7 @@ import path from 'path';
  * Throws an error if required config is missing.
  */
 
-// Check if .env file exists, if not, try to find it in the project root
-try {
-  const envPath = path.resolve(process.cwd(), '.env');
-  if (!fs.existsSync(envPath)) {
-    console.log('No .env file found at:', envPath);
-    // Try to create a temporary .env file with env variables if they're available
-    if (process.env.BTCPAY_URL && process.env.BTCPAY_API_KEY && 
-        process.env.BTCPAY_STORE_ID && process.env.BTCPAY_WEBHOOK_SECRET) {
-      console.log('Creating .env file with environment variables...');
-      const envContent = `
-BTCPAY_URL=${process.env.BTCPAY_URL}
-BTCPAY_API_KEY=${process.env.BTCPAY_API_KEY}
-BTCPAY_STORE_ID=${process.env.BTCPAY_STORE_ID}
-BTCPAY_WEBHOOK_SECRET=${process.env.BTCPAY_WEBHOOK_SECRET}
-      `;
-      try {
-        fs.writeFileSync(envPath, envContent);
-        console.log('Created .env file successfully.');
-        // Reload environment variables
-        dotenv.config();
-      } catch (err) {
-        console.error('Failed to create .env file:', err);
-      }
-    } else {
-      console.log('Environment variables are not set properly in the current environment.');
-    }
-  } else {
-    console.log('.env file found at:', envPath);
-  }
-} catch (err) {
-  console.error('Error checking for .env file:', err);
-}
+// Removed .env file checking and creation logic
 
 const btcpayUrl = process.env.BTCPAY_URL; // e.g., 'https://btcpay412113.lndyn.com'
 const btcpayApiKey = process.env.BTCPAY_API_KEY; // Use BTCPAY_KEY as requested
