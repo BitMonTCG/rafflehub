@@ -143,9 +143,9 @@ var require_express_mung = __commonJS({
           return mung2.onError(e2, req, res);
         };
         function headers_async_hook() {
-          let args2 = arguments;
           if (res.headersSent)
             return original.apply(this, args2);
+          let args2 = arguments;
           res.end = () => null;
           try {
             fn2(req, res).then(() => {
@@ -17245,7 +17245,7 @@ function viteReact(opts = {}) {
   const jsxImportSource = opts.jsxImportSource ?? "react";
   const jsxImportRuntime = `${jsxImportSource}/jsx-runtime`;
   const jsxImportDevRuntime = `${jsxImportSource}/jsx-dev-runtime`;
-  let isProduction = true;
+  let isProduction2 = true;
   let projectRoot = process.cwd();
   let skipFastRefresh = false;
   let runPluginOverrides;
@@ -17287,8 +17287,8 @@ function viteReact(opts = {}) {
     },
     configResolved(config) {
       projectRoot = config.root;
-      isProduction = config.isProduction;
-      skipFastRefresh = isProduction || config.command === "build" || config.server.hmr === false;
+      isProduction2 = config.isProduction;
+      skipFastRefresh = isProduction2 || config.command === "build" || config.server.hmr === false;
       if ("jsxPure" in opts) {
         config.logger.warnOnce(
           "[@vitejs/plugin-react] jsxPure was removed. You can configure esbuild.jsxSideEffects directly."
@@ -17301,7 +17301,7 @@ function viteReact(opts = {}) {
         };
       } else if (typeof opts.babel !== "function") {
         staticBabelOptions = createBabelOptions(opts.babel);
-        if (canSkipBabel(staticBabelOptions.plugins, staticBabelOptions) && skipFastRefresh && (opts.jsxRuntime === "classic" ? isProduction : true)) {
+        if (canSkipBabel(staticBabelOptions.plugins, staticBabelOptions) && skipFastRefresh && (opts.jsxRuntime === "classic" ? isProduction2 : true)) {
           delete viteBabel.transform;
         }
       }
@@ -17339,7 +17339,7 @@ function viteReact(opts = {}) {
           ]);
         }
         if (opts.jsxRuntime === "classic" && isJSX) {
-          if (!isProduction) {
+          if (!isProduction2) {
             plugins.push(
               await loadPlugin("@babel/plugin-transform-react-jsx-self"),
               await loadPlugin("@babel/plugin-transform-react-jsx-source")
@@ -17365,7 +17365,7 @@ function viteReact(opts = {}) {
           // Required for esbuild.jsxDev to provide correct line numbers
           // This creates issues the react compiler because the re-order is too important
           // People should use @babel/plugin-transform-react-jsx-development to get back good line numbers
-          retainLines: getReactCompilerPlugin(plugins) != null ? false : !isProduction && isJSX && opts.jsxRuntime !== "classic",
+          retainLines: getReactCompilerPlugin(plugins) != null ? false : !isProduction2 && isJSX && opts.jsxRuntime !== "classic",
           parserOpts: {
             ...babelOptions.parserOpts,
             sourceType: "module",
@@ -17651,24 +17651,55 @@ function verifyWebhookSignature(requestBody, signatureHeader) {
 var import_csurf = __toESM(require_csurf(), 1);
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-var usePgSession = false;
-var Store = usePgSession ? connectPgSimple(session) : MemoryStore(session);
-var sessionStore = usePgSession ? new Store({
-  connectionString: process.env.DATABASE_URL,
-  tableName: "user_sessions",
-  createTableIfMissing: true,
-  ssl: true,
-  // Always use SSL for PostgreSQL connections
-  pool: {
-    max: 10,
-    // Maximum number of clients in the pool
-    idleTimeoutMillis: 3e4
-    // Close idle clients after 30 seconds
+import { Pool } from "pg";
+var vercelEnv = process.env.VERCEL_ENV;
+var usePgSession = vercelEnv === "production" || vercelEnv === "preview";
+var isProduction = vercelEnv === "production";
+if (isProduction && !usePgSession) {
+  console.error("CRITICAL ERROR: Attempting to use MemoryStore in production. Exiting.");
+  process.exit(1);
+}
+console.log(`Session store: ${usePgSession ? "PostgreSQL (connect-pg-simple)" : "MemoryStore (memorystore)"} (VERCEL_ENV=${vercelEnv})`);
+var PgSessionStore = connectPgSimple(session);
+var InMemoryStore = MemoryStore(session);
+var sessionStoreInstance;
+if (usePgSession) {
+  try {
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: isProduction ? { rejectUnauthorized: false } : false,
+      // SSL config for pg.Pool
+      max: 10,
+      // Maximum number of clients in the pool
+      idleTimeoutMillis: 3e4
+      // Close idle clients after 30 seconds
+    });
+    pool.query("SELECT NOW()").then(() => {
+      console.log("\u2705 PostgreSQL connection successful");
+    }).catch((error) => {
+      console.warn("\u26A0\uFE0F  PostgreSQL connection test failed:", error);
+    });
+    sessionStoreInstance = new PgSessionStore({
+      pool,
+      // Pass the pre-configured pool
+      tableName: "user_sessions",
+      createTableIfMissing: true
+    });
+  } catch (error) {
+    console.error("\u274C PostgreSQL session store failed, falling back to MemoryStore:", error);
+    console.warn("\u26A0\uFE0F  This may cause session issues in serverless environment");
+    sessionStoreInstance = new InMemoryStore({
+      checkPeriod: 864e5
+      // prune expired entries every 24h
+    });
   }
-}) : new Store({
-  checkPeriod: 864e5
-  // prune expired entries every 24h
-});
+} else {
+  sessionStoreInstance = new InMemoryStore({
+    checkPeriod: 864e5
+    // prune expired entries every 24h
+  });
+}
+var sessionStore = sessionStoreInstance;
 function broadcast(message2) {
   console.log("Broadcast attempted (WebSocket disabled):", JSON.stringify(message2));
 }
@@ -17693,11 +17724,10 @@ async function registerRoutes(app2, storageInstance) {
       "http://127.0.0.1:3000",
       "http://127.0.0.1:5173"
     ];
-if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
-   res.header("Access-Control-Allow-Origin", requestOrigin);
-  res.header("Vary", "Origin");
-   res.header("Access-Control-Allow-Credentials", "true");
-}
+    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+      res.header("Access-Control-Allow-Origin", requestOrigin);
+      res.header("Access-Control-Allow-Credentials", "true");
+    }
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token");
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
     if (req.method === "OPTIONS") {
@@ -17807,20 +17837,29 @@ if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
     // Remove cookie configuration to use session-based tokens
   };
   const csrf = (0, import_csurf.default)(csrfProtectionOptions);
-  app2.use(csrf);
   app2.use((req, res, next) => {
     if (req.path === "/api/btcpay/webhook") {
       return next();
     }
     csrf(req, res, next);
   });
+  app2.get("/api/health", (req, res) => {
+    console.log("\u2705 Health check requested");
+    res.json({
+      status: "healthy",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      environment: process.env.VERCEL_ENV || "unknown",
+      sessionStore: usePgSession ? "postgresql" : "memory"
+    });
+  });
   app2.get("/api/csrf-token", (req, res) => {
+    console.log("\u{1F511} CSRF token requested");
     if (typeof req.csrfToken === "function") {
       const token = req.csrfToken();
-      console.log("CSRF token generated successfully");
+      console.log("\u2705 CSRF token generated successfully");
       res.json({ csrfToken: token });
     } else {
-      console.error("CSRF token function not available on request object for /api/csrf-token");
+      console.error("\u274C CSRF token function not available on request object for /api/csrf-token");
       res.status(500).json({ message: "CSRF token service not available." });
     }
   });
@@ -18815,22 +18854,27 @@ app.use(import_express_mung.default.json(function(body, req, res) {
 var isAppInitialized = false;
 async function initializeApp() {
   if (isAppInitialized) {
+    console.log("\u2705 App already initialized, returning existing instance");
     return app;
   }
+  console.log("\u{1F680} Starting Express app initialization...");
   try {
-    console.log("Database initialization skipped.");
-    console.log("BTCPay Service configuration loaded.");
+    console.log("\u{1F4CA} Database initialization skipped.");
+    console.log("\u{1F4B0} BTCPay Service configuration loaded.");
+    console.log("\u{1F6E3}\uFE0F  Registering routes...");
     await registerRoutes(app, storage);
+    console.log("\u2705 Routes registered successfully");
     app.use((err, _req, res, _next) => {
       const status = err.status || err.statusCode || 500;
       const message2 = err.message || "Internal Server Error";
-      console.error(`Global Error Handler: [${status}] ${message2}`, err.stack ? { stack: err.stack } : { error: err });
+      console.error(`\u274C Global Error Handler: [${status}] ${message2}`, err.stack ? { stack: err.stack } : { error: err });
       res.status(status).json({ message: message2 });
     });
     isAppInitialized = true;
-    console.log("Express app initialized successfully for serverless deployment");
+    console.log("\u2705 Express app initialized successfully for serverless deployment");
   } catch (error) {
-    console.error(`Error initializing app: ${error}`);
+    console.error(`\u274C Error initializing app:`, error);
+    console.error(`\u274C Error stack:`, error instanceof Error ? error.stack : "No stack trace");
     throw error;
   }
   return app;
@@ -18839,15 +18883,29 @@ async function initializeApp() {
 // api/index.ts
 var appPromise = initializeApp();
 async function handler(req, res) {
+  console.log(`\u{1F50D} API Request: ${req.method} ${req.url}`);
+  console.log(`\u{1F50D} Headers:`, JSON.stringify(req.headers, null, 2));
+  console.log(`\u{1F50D} VERCEL_ENV: ${process.env.VERCEL_ENV}`);
+  console.log(`\u{1F50D} NODE_ENV: ${process.env.NODE_ENV}`);
   try {
     const app2 = await appPromise;
+    if (!app2) {
+      console.error("\u274C Express app is null or undefined");
+      return res.status(500).json({
+        message: "Express app initialization failed",
+        error: "App instance is null"
+      });
+    }
+    console.log(`\u2705 Express app initialized, processing ${req.method} ${req.url}`);
     app2(req, res);
   } catch (error) {
-    console.error("Handler error:", error);
+    console.error("\u274C Handler error:", error);
+    console.error("\u274C Error stack:", error instanceof Error ? error.stack : "No stack trace");
     res.status(500).json({
       message: "Internal server error",
-      // Only show error details for debugging - remove in strict production if needed
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: error instanceof Error ? error.message : "Unknown error",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      requestId: req.headers["x-vercel-id"] || "unknown"
     });
   }
 }
