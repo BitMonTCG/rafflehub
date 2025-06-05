@@ -46,17 +46,33 @@ const InMemoryStore = MemoryStore(session);
 let sessionStoreInstance;
 
 if (usePgSession) {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: isProduction ? { rejectUnauthorized: false } : false, // SSL config for pg.Pool
-    max: 10, // Maximum number of clients in the pool
-    idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  });
-  sessionStoreInstance = new PgSessionStore({
-    pool: pool, // Pass the pre-configured pool
-    tableName: 'user_sessions',
-    createTableIfMissing: true,
-  });
+  try {
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: isProduction ? { rejectUnauthorized: false } : false, // SSL config for pg.Pool
+      max: 10, // Maximum number of clients in the pool
+      idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+    });
+    
+    // Test the connection in background, don't await
+    pool.query('SELECT NOW()').then(() => {
+      console.log('✅ PostgreSQL connection successful');
+    }).catch((error) => {
+      console.warn('⚠️  PostgreSQL connection test failed:', error);
+    });
+    
+    sessionStoreInstance = new PgSessionStore({
+      pool: pool, // Pass the pre-configured pool
+      tableName: 'user_sessions',
+      createTableIfMissing: true,
+    });
+  } catch (error) {
+    console.error('❌ PostgreSQL session store failed, falling back to MemoryStore:', error);
+    console.warn('⚠️  This may cause session issues in serverless environment');
+    sessionStoreInstance = new InMemoryStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    });
+  }
 } else {
   sessionStoreInstance = new InMemoryStore({
     checkPeriod: 86400000 // prune expired entries every 24h
@@ -246,15 +262,27 @@ const sessionSecret = process.env.SESSION_SECRET;
     csrf(req, res, next);
   });
   
+  // Health check endpoint (must be before CSRF middleware)
+  app.get('/api/health', (req: Request, res: Response) => {
+    console.log('✅ Health check requested');
+    res.json({ 
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      environment: process.env.VERCEL_ENV || 'unknown',
+      sessionStore: usePgSession ? 'postgresql' : 'memory'
+    });
+  });
+
   // Route to get CSRF token for client-side use
   app.get('/api/csrf-token', (req: Request, res: Response) => {
+    console.log('🔑 CSRF token requested');
     // req.csrfToken() is added by csurf middleware
     if (typeof (req as any).csrfToken === 'function') {
       const token = (req as any).csrfToken();
-      console.log('CSRF token generated successfully');
+      console.log('✅ CSRF token generated successfully');
       res.json({ csrfToken: token });
     } else {
-      console.error('CSRF token function not available on request object for /api/csrf-token');
+      console.error('❌ CSRF token function not available on request object for /api/csrf-token');
       res.status(500).json({ message: 'CSRF token service not available.' });
     }
   });
