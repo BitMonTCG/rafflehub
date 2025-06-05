@@ -17,6 +17,7 @@ import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import helmet from 'helmet';
 import csurf from 'csurf'; // Import csurf
+import { Pool } from 'pg'; // Import Pool from pg
 
 // Define a simple interface for the expected webhook payload structure
 interface BtcPayWebhookPayload {
@@ -26,26 +27,43 @@ interface BtcPayWebhookPayload {
   metadata?: { [key: string]: any };
 }
 
-// Setup session store - use memory store for development to avoid PG session store issues
-const usePgSession = false; // Temporarily use memory store
-const Store = usePgSession
-  ? connectPgSimple(session)
-  : MemoryStore(session);
+// Setup session store
+// Use PostgreSQL for session storage on Vercel (production & preview), MemoryStore for local development.
+const vercelEnv = process.env.VERCEL_ENV; // 'production', 'preview', or 'development'
+const usePgSession = vercelEnv === 'production' || vercelEnv === 'preview';
+const isProduction = vercelEnv === 'production';
 
-const sessionStore = usePgSession
-  ? new (Store as any)({
-      connectionString: process.env.DATABASE_URL,
-      tableName: 'user_sessions',
-      createTableIfMissing: true,
-      ssl: true, // Always use SSL for PostgreSQL connections
-      pool: {
-        max: 10, // Maximum number of clients in the pool
-        idleTimeoutMillis: 30000 // Close idle clients after 30 seconds
-      }
-    })
-  : new (Store as any)({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    });
+if (isProduction && !usePgSession) {
+  console.error("CRITICAL ERROR: Attempting to use MemoryStore in production. Exiting.");
+  process.exit(1); // Exit immediately to prevent running with MemoryStore
+}
+
+console.log(`Session store: ${usePgSession ? 'PostgreSQL (connect-pg-simple)' : 'MemoryStore (memorystore)'} (VERCEL_ENV=${vercelEnv})`);
+
+const PgSessionStore = connectPgSimple(session);
+const InMemoryStore = MemoryStore(session);
+
+let sessionStoreInstance;
+
+if (usePgSession) {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: isProduction ? { rejectUnauthorized: false } : false, // SSL config for pg.Pool
+    max: 10, // Maximum number of clients in the pool
+    idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  });
+  sessionStoreInstance = new PgSessionStore({
+    pool: pool, // Pass the pre-configured pool
+    tableName: 'user_sessions',
+    createTableIfMissing: true,
+  });
+} else {
+  sessionStoreInstance = new InMemoryStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  });
+}
+
+const sessionStore = sessionStoreInstance;
 
 // WebSocket functionality disabled for Vercel serverless compatibility
 

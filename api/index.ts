@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { initializeApp } from '../server/app.js';
+import { initializeApp } from '../build/server-out/server/app.js';
 
 // Initialize the Express app
 const appPromise = initializeApp();
