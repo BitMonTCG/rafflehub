@@ -26,8 +26,8 @@ interface BtcPayWebhookPayload {
   metadata?: { [key: string]: any };
 }
 
-// Setup session store based on environment
-const usePgSession = process.env.NODE_ENV === 'production' && process.env.DATABASE_URL;
+// Setup session store - use memory store for development to avoid PG session store issues
+const usePgSession = false; // Temporarily use memory store
 const Store = usePgSession
   ? connectPgSimple(session)
   : MemoryStore(session);
@@ -37,7 +37,7 @@ const sessionStore = usePgSession
       connectionString: process.env.DATABASE_URL,
       tableName: 'user_sessions',
       createTableIfMissing: true,
-      ssl: process.env.NODE_ENV === 'production', // Enable SSL for Supabase PostgreSQL
+      ssl: true, // Always use SSL for PostgreSQL connections
       pool: {
         max: 10, // Maximum number of clients in the pool
         idleTimeoutMillis: 30000 // Close idle clients after 30 seconds
@@ -64,72 +64,43 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   
   // --- Middleware ---
   // Security headers and CORS configuration
-  if (process.env.NODE_ENV === 'production') {
-    // Use full Helmet security in production
-    app.use(helmet());
-    
-    // Production CORS setup for Vercel deployment
-    app.use((req, res, next) => {
-      const origin = req.headers.origin;
-      const allowedOrigins = [
-        'https://www.bitmontcg.io',
-        'https://bitmontcg.io',
-        'https://rafflehub.vercel.app', // Add your Vercel domain if different
-      ];
-      
-      if (allowedOrigins.includes(origin as string)) {
-        res.header('Access-Control-Allow-Origin', origin);
-      }
-      
-      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  // Use production-ready security settings
+  app.use(helmet({
+    contentSecurityPolicy: false, // Disabled for frontend compatibility
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+  }));
+  
+  // CORS setup for both development and production
+  app.use((req, res, next) => {
+    const requestOrigin = req.headers.origin;
+    const allowedOrigins = [
+      'https://www.bitmontcg.io',
+      'https://bitmontcg.io',
+      'https://rafflehub.vercel.app',
+      'http://localhost:3000', // Allow local development
+      'http://localhost:5173', // Allow Vite dev server
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173',
+    ];
+
+    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+      res.header('Access-Control-Allow-Origin', requestOrigin);
       res.header('Access-Control-Allow-Credentials', 'true');
-      
-      if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-      }
-      
-      next();
-    });
-  } else {
-    // In development, apply minimal Helmet settings
-    app.use(helmet({
-      contentSecurityPolicy: false,
-      crossOriginEmbedderPolicy: false,
-      crossOriginResourcePolicy: false,
-      originAgentCluster: false,
-      dnsPrefetchControl: false,
-      referrerPolicy: false,
-      strictTransportSecurity: false,
-      xssFilter: false,
-    }));
-    
-    // Add comprehensive CORS support for development and IDE preview
-    app.use((req, res, next) => {
-      // Allow all origins for development
-      res.header('Access-Control-Allow-Origin', '*');
-      
-      // Allow common headers
-      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-      
-      // Allow all methods
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      
-      // Allow credentials
-      res.header('Access-Control-Allow-Credentials', 'true');
-      
-      // Handle preflight requests
-      if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-      }
-      
-      // Set permissive framing policy for IDE preview
-      res.removeHeader('X-Frame-Options');
-      res.header('Content-Security-Policy', "frame-ancestors 'self' *");
-      
-      next();
-    });
-  }
+    }
+    // If requestOrigin is not in allowedOrigins, Access-Control-Allow-Origin is not set.
+    // This will typically cause the browser to block the cross-origin request.
+
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH'); // Added standard methods
+
+    if (req.method === 'OPTIONS') {
+      // For OPTIONS pre-flight requests, setting the headers and returning 200 is sufficient.
+      return res.status(200).end();
+    }
+
+    next();
+  });
   
   // --- Middleware Order is Important --- 
 
@@ -212,39 +183,48 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   app.use(express.urlencoded({ extended: false })); // Add urlencoded parser for form submissions if any
 
   // Session setup (ensure sessionSecret is defined)
-  const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-  if (process.env.SESSION_SECRET !== sessionSecret) {
-      console.log('WARNING: Using auto-generated session secret. Set SESSION_SECRET env var for persistent sessions.');
-  }
+if (!process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET must be set in environment variables.');
+}
+const sessionSecret = process.env.SESSION_SECRET;
+  
+  // Cookie configuration for production-ready security
+  const cookieConfig = {
+    secure: false, // Set to false to work in both HTTP (dev) and HTTPS (prod) - Vercel handles HTTPS termination
+    httpOnly: true,
+    sameSite: 'lax' as const, // Use 'lax' for better compatibility
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+  };
+  
+  // Add session store debug logging
+  console.log('Session store type:', usePgSession ? 'PostgreSQL' : 'Memory');
+  console.log('DATABASE_URL available:', !!process.env.DATABASE_URL);
+  
   app.use(session({
     store: sessionStore,
     secret: sessionSecret,
-    resave: true, 
+    resave: false, // Changed from true to false for better session handling
     saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-    },
+    cookie: cookieConfig,
     name: 'bitmon_sid',
   }));
 
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // CSRF Protection
+  // CSRF Protection - use session-based tokens since sessions are working
   const csrfProtectionOptions = { 
-    cookie: true,
-    // ignoreMethods: ['GET', 'HEAD', 'OPTIONS'], // csurf default ignores these already
+    // Use session store for CSRF tokens (default behavior)
+    // Remove cookie configuration to use session-based tokens
   };
   const csrf = csurf(csrfProtectionOptions);
 
   app.use((req, res, next) => {
-    if (req.path === '/api/btcpay/webhook') { // Already handled above, so CSRF is skipped
+    if (req.path === '/api/btcpay/webhook') { 
+      // Skip CSRF for webhook route only
       return next();
     }
-    // Apply CSRF to all other routes that are not GET, HEAD, OPTIONS by default
+    // Apply CSRF to all other routes (including GET for token generation)
     csrf(req, res, next);
   });
   
@@ -252,7 +232,9 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   app.get('/api/csrf-token', (req: Request, res: Response) => {
     // req.csrfToken() is added by csurf middleware
     if (typeof (req as any).csrfToken === 'function') {
-      res.json({ csrfToken: (req as any).csrfToken() });
+      const token = (req as any).csrfToken();
+      console.log('CSRF token generated successfully');
+      res.json({ csrfToken: token });
     } else {
       console.error('CSRF token function not available on request object for /api/csrf-token');
       res.status(500).json({ message: 'CSRF token service not available.' });

@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
+import mung from "express-mung"; // Added import for express-mung
 import { registerRoutes } from "./routes.js";
 import { storage } from "./storage.js";
 import type { IStorage } from "./storage.js";
@@ -22,34 +23,33 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Request logging middleware for API routes
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+// Request logging middleware for API routes
+// Uses express-mung to safely capture the JSON response body
+app.use(
+  mung.json(function (body, req, res) {
+    // Note: 'finish' event is used here as mung.json executes before the response is fully sent.
+    // For logging purposes, we want to log after the response is completed.
+    const start = Date.now();
+    const path = req.path;
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      if (path.startsWith("/api")) {
+        let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+        if (body) {
+          // body is the captured JSON response
+          logLine += ` :: ${JSON.stringify(body)}`;
+        }
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        if (logLine.length > 80) {
+          logLine = logLine.slice(0, 79) + "…";
+        }
+        console.log(logLine);
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-      console.log(logLine);
-    }
-  });
-
-  next();
-});
+    });
+    return body; // Important: return the body to pass it through
+  })
+);
 
 // Initialize app asynchronously
 let isAppInitialized = false;

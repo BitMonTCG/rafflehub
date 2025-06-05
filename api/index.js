@@ -12520,20 +12520,20 @@ var require_nodemailer = __commonJS({
   }
 });
 
-// build/server-out/server/app.js
+// server/app.ts
 import dotenv3 from "dotenv";
 import express3 from "express";
 
-// build/server-out/server/env.js
+// server/env.ts
 import dotenv from "dotenv";
 dotenv.config();
 var env = process.env;
 
-// build/server-out/server/db.js
+// server/db.ts
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-// build/server-out/shared/schema.js
+// shared/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
   insertRaffleSchema: () => insertRaffleSchema,
@@ -16620,7 +16620,7 @@ function p(e2) {
   return m2 || (m2 = external_exports.any()), m2;
 }
 
-// build/server-out/shared/schema.js
+// shared/schema.ts
 var users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -16702,15 +16702,16 @@ var insertWinnerSchema = c(winners).omit({
   announcedAt: true
 });
 
-// build/server-out/server/db.js
+// server/db.ts
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL must be set. Did you forget to set it in your .env file or environment variables?");
+  throw new Error(
+    "DATABASE_URL must be set. Did you forget to set it in your .env file or environment variables?"
+  );
 }
 var connectionString = process.env.DATABASE_URL;
-var isProduction = process.env.NODE_ENV === "production";
 var client = postgres(connectionString, {
-  ssl: isProduction ? "require" : false,
-  // Enforce SSL in production (e.g., for Supabase)
+  ssl: "require",
+  // Always enforce SSL for security (works with Supabase)
   max: 10,
   // Connection pool size
   idle_timeout: 20,
@@ -16719,9 +16720,9 @@ var client = postgres(connectionString, {
   // Optional: seconds before closing connections (even if active)
 });
 var db = drizzle(client, { schema: schema_exports });
-console.log(isProduction ? "Connected to PostgreSQL (Production - Supabase with SSL)" : "Connected to PostgreSQL (Development)");
+console.log("Connected to PostgreSQL with SSL");
 
-// build/server-out/server/routes.js
+// server/routes.ts
 var import_passport_local = __toESM(require_lib2(), 1);
 import express2 from "express";
 import passport from "passport";
@@ -16911,17 +16912,21 @@ function fromError(err, options = {}) {
   return toValidationError(options)(err);
 }
 
-// build/server-out/server/btcpayService.js
-import { InvoicesService, ApiError, InvoiceStatus } from "btcpay-greenfield-node-client";
+// server/btcpayService.ts
+import {
+  InvoicesService,
+  ApiError,
+  InvoiceStatus
+} from "btcpay-greenfield-node-client";
 import crypto from "crypto";
 
-// build/server-out/server/vite.js
+// server/vite.ts
 import express from "express";
 import fs from "fs";
 import path2 from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 
-// build/server-out/vite.config.js
+// vite.config.ts
 import { defineConfig } from "vite";
 
 // node_modules/@vitejs/plugin-react/dist/index.mjs
@@ -17078,7 +17083,7 @@ function viteReact(opts = {}) {
   const jsxImportSource = opts.jsxImportSource ?? "react";
   const jsxImportRuntime = `${jsxImportSource}/jsx-runtime`;
   const jsxImportDevRuntime = `${jsxImportSource}/jsx-dev-runtime`;
-  let isProduction2 = true;
+  let isProduction = true;
   let projectRoot = process.cwd();
   let skipFastRefresh = false;
   let runPluginOverrides;
@@ -17120,8 +17125,8 @@ function viteReact(opts = {}) {
     },
     configResolved(config) {
       projectRoot = config.root;
-      isProduction2 = config.isProduction;
-      skipFastRefresh = isProduction2 || config.command === "build" || config.server.hmr === false;
+      isProduction = config.isProduction;
+      skipFastRefresh = isProduction || config.command === "build" || config.server.hmr === false;
       if ("jsxPure" in opts) {
         config.logger.warnOnce(
           "[@vitejs/plugin-react] jsxPure was removed. You can configure esbuild.jsxSideEffects directly."
@@ -17134,7 +17139,7 @@ function viteReact(opts = {}) {
         };
       } else if (typeof opts.babel !== "function") {
         staticBabelOptions = createBabelOptions(opts.babel);
-        if (canSkipBabel(staticBabelOptions.plugins, staticBabelOptions) && skipFastRefresh && (opts.jsxRuntime === "classic" ? isProduction2 : true)) {
+        if (canSkipBabel(staticBabelOptions.plugins, staticBabelOptions) && skipFastRefresh && (opts.jsxRuntime === "classic" ? isProduction : true)) {
           delete viteBabel.transform;
         }
       }
@@ -17172,7 +17177,7 @@ function viteReact(opts = {}) {
           ]);
         }
         if (opts.jsxRuntime === "classic" && isJSX) {
-          if (!isProduction2) {
+          if (!isProduction) {
             plugins.push(
               await loadPlugin("@babel/plugin-transform-react-jsx-self"),
               await loadPlugin("@babel/plugin-transform-react-jsx-source")
@@ -17198,7 +17203,7 @@ function viteReact(opts = {}) {
           // Required for esbuild.jsxDev to provide correct line numbers
           // This creates issues the react compiler because the re-order is too important
           // People should use @babel/plugin-transform-react-jsx-development to get back good line numbers
-          retainLines: getReactCompilerPlugin(plugins) != null ? false : !isProduction2 && isJSX && opts.jsxRuntime !== "classic",
+          retainLines: getReactCompilerPlugin(plugins) != null ? false : !isProduction && isJSX && opts.jsxRuntime !== "classic",
           parserOpts: {
             ...babelOptions.parserOpts,
             sourceType: "module",
@@ -17337,7 +17342,7 @@ function ensureArray(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-// build/server-out/vite.config.js
+// vite.config.ts
 import path from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 var __filename = fileURLToPath2(import.meta.url);
@@ -17373,7 +17378,7 @@ var vite_config_default = defineConfig({
   }
 });
 
-// build/server-out/server/vite.js
+// server/vite.ts
 import { nanoid } from "nanoid";
 var viteLogger = createLogger();
 function log2(message2, source = "express") {
@@ -17386,7 +17391,7 @@ function log2(message2, source = "express") {
   console.log(`${formattedTime} [${source}] ${message2}`);
 }
 
-// build/server-out/config/btcpay.js
+// config/btcpay.ts
 import dotenv2 from "dotenv";
 import { OpenAPI } from "btcpay-greenfield-node-client";
 dotenv2.config();
@@ -17416,7 +17421,7 @@ var btcpayConfig = {
   // We don't export url and apiKey as they are set globally via OpenAPI
 };
 
-// build/server-out/server/btcpayService.js
+// server/btcpayService.ts
 var CURRENCY = "USD";
 async function createRaffleTicketInvoice(userId, raffleId, ticketId, rafflePrice, raffleName, buyerEmail = void 0) {
   const orderId = `raffle-${raffleId}-ticket-${ticketId}`;
@@ -17480,19 +17485,19 @@ function verifyWebhookSignature(requestBody, signatureHeader) {
   return true;
 }
 
-// build/server-out/server/routes.js
+// server/routes.ts
 var import_csurf = __toESM(require_csurf(), 1);
 import rateLimit from "express-rate-limit";
 import crypto2 from "crypto";
 import helmet from "helmet";
-var usePgSession = process.env.NODE_ENV === "production" && process.env.DATABASE_URL;
+var usePgSession = process.env.DATABASE_URL;
 var Store = usePgSession ? connectPgSimple(session) : MemoryStore(session);
 var sessionStore = usePgSession ? new Store({
   connectionString: process.env.DATABASE_URL,
   tableName: "user_sessions",
   createTableIfMissing: true,
-  ssl: process.env.NODE_ENV === "production",
-  // Enable SSL for Supabase PostgreSQL
+  ssl: true,
+  // Always use SSL for PostgreSQL connections
   pool: {
     max: 10,
     // Maximum number of clients in the pool
@@ -17508,51 +17513,36 @@ function broadcast(message2) {
 }
 async function registerRoutes(app2, storageInstance) {
   console.log("Registering routes for serverless deployment (WebSocket disabled)");
-  if (process.env.NODE_ENV === "production") {
-    app2.use(helmet());
-    app2.use((req, res, next) => {
-      const origin = req.headers.origin;
-      const allowedOrigins = [
-        "https://www.bitmontcg.io",
-        "https://bitmontcg.io",
-        "https://rafflehub.vercel.app"
-        // Add your Vercel domain if different
-      ];
-      if (allowedOrigins.includes(origin)) {
-        res.header("Access-Control-Allow-Origin", origin);
-      }
-      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token");
-      res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-      res.header("Access-Control-Allow-Credentials", "true");
-      if (req.method === "OPTIONS") {
-        return res.status(200).end();
-      }
-      next();
-    });
-  } else {
-    app2.use(helmet({
-      contentSecurityPolicy: false,
-      crossOriginEmbedderPolicy: false,
-      crossOriginResourcePolicy: false,
-      originAgentCluster: false,
-      dnsPrefetchControl: false,
-      referrerPolicy: false,
-      strictTransportSecurity: false,
-      xssFilter: false
-    }));
-    app2.use((req, res, next) => {
-      res.header("Access-Control-Allow-Origin", "*");
-      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-      res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-      res.header("Access-Control-Allow-Credentials", "true");
-      if (req.method === "OPTIONS") {
-        return res.status(200).end();
-      }
-      res.removeHeader("X-Frame-Options");
-      res.header("Content-Security-Policy", "frame-ancestors 'self' *");
-      next();
-    });
-  }
+  app2.use(helmet({
+    contentSecurityPolicy: false,
+    // Disabled for frontend compatibility
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false
+  }));
+  app2.use((req, res, next) => {
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      "https://www.bitmontcg.io",
+      "https://bitmontcg.io",
+      "https://rafflehub.vercel.app",
+      "http://localhost:3000",
+      // Allow local development
+      "http://localhost:5173",
+      // Allow Vite dev server
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:5173"
+    ];
+    if (allowedOrigins.includes(origin)) {
+      res.header("Access-Control-Allow-Origin", origin);
+    }
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Credentials", "true");
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+    next();
+  });
   app2.post("/api/btcpay/webhook", express2.raw({ type: "application/json" }), async (req, res) => {
     const signature = req.headers["btcpay-sig"];
     const requestBody = req.body;
@@ -17628,18 +17618,22 @@ async function registerRoutes(app2, storageInstance) {
   if (process.env.SESSION_SECRET !== sessionSecret) {
     console.log("WARNING: Using auto-generated session secret. Set SESSION_SECRET env var for persistent sessions.");
   }
+  const cookieConfig = {
+    secure: false,
+    // Set to false to work in both HTTP (dev) and HTTPS (prod) - Vercel handles HTTPS termination
+    httpOnly: true,
+    sameSite: "lax",
+    // Use 'lax' for better compatibility
+    maxAge: 1e3 * 60 * 60 * 24 * 7
+    // 1 week
+  };
   app2.use(session({
     store: sessionStore,
     secret: sessionSecret,
-    resave: true,
+    resave: false,
+    // Changed from true to false for better session handling
     saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 1e3 * 60 * 60 * 24 * 7
-      // 1 week
-    },
+    cookie: cookieConfig,
     name: "bitmon_sid"
   }));
   app2.use(passport.initialize());
@@ -17687,20 +17681,23 @@ async function registerRoutes(app2, storageInstance) {
       return done(error);
     }
   }));
-  passport.use("admin-strategy", new import_passport_local.Strategy({ usernameField: "username", passwordField: "password" }, (username, password, done) => {
-    const adminUsername = process.env.ADMIN_USERNAME;
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminUsername || !adminPassword) {
-      console.error("Admin credentials are not set in environment variables.");
-      return done(null, false, { message: "Admin configuration error." });
+  passport.use("admin-strategy", new import_passport_local.Strategy(
+    { usernameField: "username", passwordField: "password" },
+    (username, password, done) => {
+      const adminUsername = process.env.ADMIN_USERNAME;
+      const adminPassword = process.env.ADMIN_PASSWORD;
+      if (!adminUsername || !adminPassword) {
+        console.error("Admin credentials are not set in environment variables.");
+        return done(null, false, { message: "Admin configuration error." });
+      }
+      if (username === adminUsername && password === adminPassword) {
+        const adminUser = { id: "admin_user_id", username: adminUsername, role: "admin" };
+        return done(null, adminUser);
+      } else {
+        return done(null, false, { message: "Incorrect admin username or password." });
+      }
     }
-    if (username === adminUsername && password === adminPassword) {
-      const adminUser = { id: "admin_user_id", username: adminUsername, role: "admin" };
-      return done(null, adminUser);
-    } else {
-      return done(null, false, { message: "Incorrect admin username or password." });
-    }
-  }));
+  ));
   passport.serializeUser((user, done) => {
     done(null, user.id);
   });
@@ -18182,7 +18179,7 @@ async function registerRoutes(app2, storageInstance) {
   console.log("Routes registered successfully for serverless deployment");
 }
 
-// build/server-out/server/emailService.js
+// server/emailService.ts
 var import_nodemailer = __toESM(require_nodemailer(), 1);
 var transporter = import_nodemailer.default.createTransport({
   host: process.env.EMAIL_HOST || "your_email_host",
@@ -18200,7 +18197,9 @@ var transporter = import_nodemailer.default.createTransport({
 });
 var sendWinnerNotification = async (userEmail, username, raffleTitle, cardName, retailPrice, winnerPrice, raffleId) => {
   if (process.env.EMAIL_HOST === "your_email_host" || process.env.EMAIL_USER === "your_email_user" || process.env.EMAIL_PASSWORD === "your_email_password" || !process.env.EMAIL_FROM || process.env.EMAIL_FROM === '"Rafflehub" <noreply@example.com>') {
-    console.log(`Skipping email notification due to placeholder or missing email config. Winner: ${userEmail}, Raffle: ${raffleTitle}, Prize: ${cardName}, RaffleID: ${raffleId}`);
+    console.log(
+      `Skipping email notification due to placeholder or missing email config. Winner: ${userEmail}, Raffle: ${raffleTitle}, Prize: ${cardName}, RaffleID: ${raffleId}`
+    );
     return;
   }
   const subject = `\u{1F389} Congratulations! You've Won the ${cardName} Raffle!`;
@@ -18258,7 +18257,7 @@ var sendWinnerNotification = async (userEmail, username, raffleTitle, cardName, 
   }
 };
 
-// build/server-out/server/DatabaseStorage.js
+// server/DatabaseStorage.ts
 import { eq, and, desc, sql } from "drizzle-orm";
 var DatabaseStorage = class {
   /**
@@ -18369,8 +18368,7 @@ var DatabaseStorage = class {
   async createUser(insertUser) {
     const validatedUser = insertUserSchema.parse(insertUser);
     const [user] = await db.insert(users).values(validatedUser).returning();
-    if (!user)
-      throw new Error("Failed to create user");
+    if (!user) throw new Error("Failed to create user");
     return user;
   }
   async getUsers() {
@@ -18413,8 +18411,7 @@ var DatabaseStorage = class {
       isActive: validatedRaffle.isActive
     };
     const [raffle] = await db.insert(raffles).values(raffleInsert).returning();
-    if (!raffle)
-      throw new Error("Failed to create raffle");
+    if (!raffle) throw new Error("Failed to create raffle");
     return raffle;
   }
   async updateRaffle(id, data) {
@@ -18472,7 +18469,7 @@ var DatabaseStorage = class {
   async createTicket(insertTicket) {
     const validatedTicket = insertTicketSchema.parse(insertTicket);
     const ticket = await db.transaction(async (tx) => {
-      const [raffle] = await tx.select().from(raffles).where(eq(raffles.id, validatedTicket.raffleId));
+      const [raffle] = await tx.select().from(raffles).where(eq(raffles.id, validatedTicket.raffleId)).for('update');
       if (!raffle) {
         throw new Error("Raffle not found");
       }
@@ -18483,10 +18480,11 @@ var DatabaseStorage = class {
       if (!newTicket) {
         throw new Error("Failed to create ticket");
       }
+      // Atomically increment soldTickets
+      await tx.update(raffles).set({ soldTickets: sql`${raffles.soldTickets} + 1` }).where(eq(raffles.id, validatedTicket.raffleId));
       return newTicket;
     });
-    if (!ticket)
-      throw new Error("Transaction failed for ticket creation");
+    if (!ticket) throw new Error("Transaction failed for ticket creation");
     return ticket;
   }
   async getTicketCount(raffleId) {
@@ -18495,23 +18493,26 @@ var DatabaseStorage = class {
   }
   // BTCPay Integration Methods
   async createPendingTicket(raffleId, userId) {
-    const raffle = await this.getRaffle(raffleId);
-    if (!raffle) {
-      throw new Error("Raffle not found");
-    }
-    if (raffle.soldTickets >= raffle.totalTickets) {
-      throw new Error("No tickets available for this raffle");
-    }
-    const [ticket] = await db.insert(tickets).values({ raffleId, userId, status: "pending" }).returning();
-    return ticket ?? null;
+    return await db.transaction(async (tx) => {
+      const [raffle] = await tx.select().from(raffles).where(eq(raffles.id, raffleId)).for('update');
+      if (!raffle) {
+        throw new Error("Raffle not found");
+      }
+      const [{ totalReserved }] = await tx.select({ totalReserved: sql`cast(count(*) as int)` }).from(tickets).where(eq(tickets.raffleId, raffleId));
+      const reservedCount = totalReserved ?? 0;
+      if (reservedCount >= raffle.totalTickets) {
+        throw new Error("No tickets available for this raffle");
+      }
+      const [ticket] = await tx.insert(tickets).values({ raffleId, userId, status: "pending" }).returning();
+      return ticket ?? null;
+    });
   }
   async updateTicketInvoiceDetails(ticketId, btcpayInvoiceId, reservedAt) {
     const [ticket] = await db.update(tickets).set({ btcpayInvoiceId, reservedAt }).where(eq(tickets.id, ticketId)).returning();
     return ticket ?? null;
   }
   async getTicketByInvoiceId(invoiceId) {
-    if (!invoiceId)
-      return null;
+    if (!invoiceId) return null;
     const [ticket] = await db.select().from(tickets).where(eq(tickets.btcpayInvoiceId, invoiceId)).limit(1);
     return ticket ?? null;
   }
@@ -18546,8 +18547,7 @@ var DatabaseStorage = class {
   async createWinner(insertWinner) {
     const validatedWinner = insertWinnerSchema.parse(insertWinner);
     const [winner] = await db.insert(winners).values(validatedWinner).returning();
-    if (!winner)
-      throw new Error("Failed to create winner");
+    if (!winner) throw new Error("Failed to create winner");
     return winner;
   }
   async updateWinner(id, winnerUpdate) {
@@ -18602,7 +18602,15 @@ var DatabaseStorage = class {
         return false;
       }
       const cardName = raffle.title;
-      await sendWinnerNotification(user.email, user.username, raffle.title, cardName, raffle.retailPrice, raffle.winnerPrice, raffle.id);
+      await sendWinnerNotification(
+        user.email,
+        user.username,
+        raffle.title,
+        cardName,
+        raffle.retailPrice,
+        raffle.winnerPrice,
+        raffle.id
+      );
       await this.updateWinner(winnerId, {
         announcedAt: /* @__PURE__ */ new Date()
       });
@@ -18615,10 +18623,10 @@ var DatabaseStorage = class {
   }
 };
 
-// build/server-out/server/storage.js
+// server/storage.ts
 var storage = new DatabaseStorage();
 
-// build/server-out/server/app.js
+// server/app.ts
 dotenv3.config();
 process.on("uncaughtException", (err) => {
   console.error(`Uncaught exception: ${err.message}`, "process");
@@ -18678,19 +18686,17 @@ async function initializeApp() {
 }
 
 // api/index.ts
-var cachedApp = null;
+var appPromise = initializeApp();
 async function handler(req, res) {
   try {
-    if (!cachedApp) {
-      console.log("Initializing Express app for Vercel serverless...");
-      cachedApp = await initializeApp();
-    }
-    return cachedApp(req, res);
+    const app2 = await appPromise;
+    app2(req, res);
   } catch (error) {
-    console.error("Vercel handler error:", error);
+    console.error("Handler error:", error);
     res.status(500).json({
       message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error : void 0
+      // Only show error details for debugging - remove in strict production if needed
+      error: error instanceof Error ? error.message : "Unknown error"
     });
   }
 }
