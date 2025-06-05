@@ -376,22 +376,39 @@ export class DatabaseStorage implements IStorage {
 
   // BTCPay Integration Methods
   async createPendingTicket(raffleId: number, userId: number): Promise<Ticket | null> {
-    // First check if the raffle has available tickets
-    const raffle = await this.getRaffle(raffleId);
-    if (!raffle) {
-      throw new Error("Raffle not found");
-    }
-    
-    // Check if the raffle has available tickets
-    if (raffle.soldTickets >= raffle.totalTickets) {
-      throw new Error("No tickets available for this raffle");
-    }
-    
-    const [ticket] = await db
-      .insert(tickets)
-      .values({ raffleId, userId, status: 'pending' })
-      .returning();
-    return ticket ?? null;
+    // Use a transaction to atomically check availability and create pending ticket
+    return await db.transaction(async (tx: PgTransaction<PostgresJsQueryResultHKT, PgSchema, ExtractTablesWithRelations<PgSchema>>) => {
+      // Get the current raffle state within the transaction
+      const [raffle] = await tx
+        .select()
+        .from(raffles)
+        .where(eq(raffles.id, raffleId))
+        .limit(1);
+
+      if (!raffle) {
+        throw new Error("Raffle not found");
+      }
+
+      // Count total tickets (both pending and paid) to prevent overselling
+      const [{ totalReserved }] = await tx
+        .select({ totalReserved: sql<number>`cast(count(*) as int)` })
+        .from(tickets)
+        .where(eq(tickets.raffleId, raffleId));
+
+      // Check if there are available tickets (including pending ones)
+      const reservedCount = totalReserved ?? 0;
+      if (reservedCount >= raffle.totalTickets) {
+        throw new Error("No tickets available for this raffle");
+      }
+
+      // Create the pending ticket within the same transaction
+      const [ticket] = await tx
+        .insert(tickets)
+        .values({ raffleId, userId, status: 'pending' })
+        .returning();
+
+      return ticket ?? null;
+    });
   }
 
   async updateTicketInvoiceDetails(ticketId: number, btcpayInvoiceId: string, reservedAt: Date): Promise<Ticket | null> {

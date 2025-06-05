@@ -12,7 +12,7 @@ process.on('unhandledRejection', (reason) => {
   console.error(`Unhandled Rejection: ${reason}`, 'process');
 });
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 
 (async () => {
   try {

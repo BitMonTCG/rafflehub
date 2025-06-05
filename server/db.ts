@@ -14,12 +14,11 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Configure postgres.js client
+// Configure postgres.js client with production-ready settings
 const connectionString = process.env.DATABASE_URL;
-const isProduction = process.env.NODE_ENV === 'production';
 
 const client = postgres(connectionString, {
-  ssl: isProduction ? 'require' : false, // Enforce SSL in production (e.g., for Supabase)
+  ssl: 'require', // Always enforce SSL for security (works with Supabase)
   max: 10, // Connection pool size
   idle_timeout: 20, // Optional: seconds before closing idle connections
   max_lifetime: 60 * 30, // Optional: seconds before closing connections (even if active)
@@ -31,8 +30,4 @@ export const db: PostgresJsDatabase<PgSchema> = drizzle(client, { schema });
 // This makes it easy to use your tables, relations, etc.
 export * from '../shared/schema.js'; // Export from unified PostgreSQL schema
 
-console.log(
-  isProduction
-    ? 'Connected to PostgreSQL (Production - Supabase with SSL)'
-    : 'Connected to PostgreSQL (Development)',
-);
+console.log('Connected to PostgreSQL with SSL');
