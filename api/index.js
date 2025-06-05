@@ -34,6 +34,173 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// node_modules/express-mung/index.js
+var require_express_mung = __commonJS({
+  "node_modules/express-mung/index.js"(exports2, module2) {
+    "use strict";
+    var mung2 = {};
+    var faux_fin = { end: () => null };
+    function isScalar(v) {
+      return typeof v !== "object" && !Array.isArray(v);
+    }
+    mung2.onError = (err, req, res) => {
+      res.status(500).set("content-language", "en").json({ message: err.message }).end();
+      return res;
+    };
+    mung2.json = function json2(fn2, options) {
+      return function(req, res, next) {
+        let original = res.json;
+        options = options || {};
+        let mungError = options.mungError;
+        function json_hook(json3) {
+          let originalJson = json3;
+          res.json = original;
+          if (res.headersSent)
+            return res;
+          if (!mungError && res.statusCode >= 400)
+            return original.call(this, json3);
+          try {
+            json3 = fn2(json3, req, res);
+          } catch (e2) {
+            return mung2.onError(e2, req, res);
+          }
+          if (res.headersSent)
+            return res;
+          if (json3 === void 0)
+            json3 = originalJson;
+          if (json3 === null)
+            return res.status(204).end();
+          if (originalJson !== json3 && isScalar(json3)) {
+            res.set("content-type", "text/plain");
+            return res.send(String(json3));
+          }
+          return original.call(this, json3);
+        }
+        res.json = json_hook;
+        next && next();
+      };
+    };
+    mung2.jsonAsync = function json2(fn2, options) {
+      return function(req, res, next) {
+        let original = res.json;
+        options = options || {};
+        let mungError = options.mungError;
+        function json_async_hook(json3) {
+          let originalJson = json3;
+          res.json = original;
+          if (res.headersSent)
+            return;
+          if (!mungError && res.statusCode >= 400)
+            return original.call(this, json3);
+          try {
+            fn2(json3, req, res).then((json4) => {
+              if (res.headersSent)
+                return;
+              if (json4 === null)
+                return res.status(204).end();
+              if (json4 !== originalJson && isScalar(json4)) {
+                res.set("content-type", "text/plain");
+                return res.send(String(json4));
+              }
+              return original.call(this, json4);
+            }).catch((e2) => mung2.onError(e2, req, res));
+          } catch (e2) {
+            mung2.onError(e2, req, res);
+          }
+          return faux_fin;
+        }
+        res.json = json_async_hook;
+        next && next();
+      };
+    };
+    mung2.headers = function headers(fn2) {
+      return function(req, res, next) {
+        let original = res.end;
+        function headers_hook() {
+          res.end = original;
+          if (!res.headersSent) {
+            try {
+              fn2(req, res);
+            } catch (e2) {
+              return mung2.onError(e2, req, res);
+            }
+            if (res.headersSent) {
+              console.error("sending response while in mung.headers is undefined behaviour");
+              return;
+            }
+          }
+          return original.apply(this, arguments);
+        }
+        res.end = headers_hook;
+        next && next();
+      };
+    };
+    mung2.headersAsync = function headersAsync(fn2) {
+      return function(req, res, next) {
+        let original = res.end;
+        let onError = (e2) => {
+          res.end = original;
+          return mung2.onError(e2, req, res);
+        };
+        function headers_async_hook() {
+          if (res.headersSent)
+            return original.apply(this, args2);
+          let args2 = arguments;
+          res.end = () => null;
+          try {
+            fn2(req, res).then(() => {
+              res.end = original;
+              if (res.headersSent)
+                return;
+              original.apply(this, args2);
+            }).catch((e2) => onError(e2, req, res));
+          } catch (e2) {
+            onError(e2, req, res);
+          }
+        }
+        res.end = headers_async_hook;
+        next && next();
+      };
+    };
+    mung2.write = function write(fn2, options = {}) {
+      return function(req, res, next) {
+        const original = res.write;
+        const mungError = options.mungError;
+        function write_hook(chunk, encoding, callback) {
+          if (res.finished) {
+            return false;
+          }
+          if (!mungError && res.statusCode >= 400) {
+            return original.apply(res, arguments);
+          }
+          try {
+            let modifiedChunk = fn2(
+              chunk,
+              // Since `encoding` is an optional argument to `res.write`,
+              // make sure it is a string and not actually the callback.
+              typeof encoding === "string" ? encoding : null,
+              req,
+              res
+            );
+            if (res.finished) {
+              return false;
+            }
+            if (modifiedChunk === void 0) {
+              modifiedChunk = chunk;
+            }
+            return original.call(res, modifiedChunk, encoding, callback);
+          } catch (err) {
+            return mung2.onError(err, req, res);
+          }
+        }
+        res.write = write_hook;
+        next && next();
+      };
+    };
+    module2.exports = mung2;
+  }
+});
+
 // node_modules/passport-strategy/lib/strategy.js
 var require_strategy = __commonJS({
   "node_modules/passport-strategy/lib/strategy.js"(exports2, module2) {
@@ -1046,11 +1213,11 @@ var require_http_errors = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     exports2.sign = function(val, secret) {
       if ("string" != typeof val) throw new TypeError("Cookie value must be provided as a string.");
       if ("string" != typeof secret) throw new TypeError("Secret string must be provided.");
-      return val + "." + crypto3.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+      return val + "." + crypto2.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
     };
     exports2.unsign = function(val, secret) {
       if ("string" != typeof val) throw new TypeError("Signed cookie string must be provided.");
@@ -1059,7 +1226,7 @@ var require_cookie_signature = __commonJS({
       return sha1(mac) == sha1(val) ? str : false;
     };
     function sha1(str) {
-      return crypto3.createHash("sha1").update(str).digest("hex");
+      return crypto2.createHash("sha1").update(str).digest("hex");
     }
   }
 });
@@ -1094,8 +1261,8 @@ var require_rndm = __commonJS({
 var require_random_bytes = __commonJS({
   "node_modules/random-bytes/index.js"(exports2, module2) {
     "use strict";
-    var crypto3 = __require("crypto");
-    var generateAttempts = crypto3.randomBytes === crypto3.pseudoRandomBytes ? 1 : 3;
+    var crypto2 = __require("crypto");
+    var generateAttempts = crypto2.randomBytes === crypto2.pseudoRandomBytes ? 1 : 3;
     module2.exports = randomBytes;
     module2.exports.sync = randomBytesSync;
     function randomBytes(size, callback) {
@@ -1119,7 +1286,7 @@ var require_random_bytes = __commonJS({
       var err = null;
       for (var i2 = 0; i2 < generateAttempts; i2++) {
         try {
-          return crypto3.randomBytes(size);
+          return crypto2.randomBytes(size);
         } catch (e2) {
           err = e2;
         }
@@ -1127,7 +1294,7 @@ var require_random_bytes = __commonJS({
       throw err;
     }
     function generateRandomBytes(size, attempts, callback) {
-      crypto3.randomBytes(size, function onRandomBytes(err, buf) {
+      crypto2.randomBytes(size, function onRandomBytes(err, buf) {
         if (!err) return callback(null, buf);
         if (!--attempts) return callback(err);
         setTimeout(generateRandomBytes.bind(null, size, attempts, callback), 10);
@@ -1182,13 +1349,13 @@ var require_uid_safe = __commonJS({
 var require_lib3 = __commonJS({
   "node_modules/tsscmp/lib/index.js"(exports2, module2) {
     "use strict";
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     function bufferEqual(a2, b) {
       if (a2.length !== b.length) {
         return false;
       }
-      if (crypto3.timingSafeEqual) {
-        return crypto3.timingSafeEqual(a2, b);
+      if (crypto2.timingSafeEqual) {
+        return crypto2.timingSafeEqual(a2, b);
       }
       for (var i2 = 0; i2 < a2.length; i2++) {
         if (a2[i2] !== b[i2]) {
@@ -1200,9 +1367,9 @@ var require_lib3 = __commonJS({
     function timeSafeCompare(a2, b) {
       var sa = String(a2);
       var sb = String(b);
-      var key = crypto3.pseudoRandomBytes(32);
-      var ah = crypto3.createHmac("sha256", key).update(sa).digest();
-      var bh = crypto3.createHmac("sha256", key).update(sb).digest();
+      var key = crypto2.pseudoRandomBytes(32);
+      var ah = crypto2.createHmac("sha256", key).update(sa).digest();
+      var bh = crypto2.createHmac("sha256", key).update(sb).digest();
       return bufferEqual(ah, bh) && a2 === b;
     }
     module2.exports = timeSafeCompare;
@@ -1216,7 +1383,7 @@ var require_csrf = __commonJS({
     var rndm = require_rndm();
     var uid = require_uid_safe();
     var compare = require_lib3();
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     var EQUAL_GLOBAL_REGEXP = /=/g;
     var PLUS_GLOBAL_REGEXP = /\+/g;
     var SLASH_GLOBAL_REGEXP = /\//g;
@@ -1268,7 +1435,7 @@ var require_csrf = __commonJS({
       return compare(token, expected);
     };
     function hash(str) {
-      return crypto3.createHash("sha1").update(str, "ascii").digest("base64").replace(PLUS_GLOBAL_REGEXP, "-").replace(SLASH_GLOBAL_REGEXP, "_").replace(EQUAL_GLOBAL_REGEXP, "");
+      return crypto2.createHash("sha1").update(str, "ascii").digest("base64").replace(PLUS_GLOBAL_REGEXP, "-").replace(SLASH_GLOBAL_REGEXP, "_").replace(EQUAL_GLOBAL_REGEXP, "");
     }
   }
 });
@@ -5872,7 +6039,7 @@ var require_le_unix = __commonJS({
 var require_mime_node = __commonJS({
   "node_modules/nodemailer/lib/mime-node/index.js"(exports2, module2) {
     "use strict";
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     var fs2 = __require("fs");
     var punycode = require_punycode();
     var PassThrough = __require("stream").PassThrough;
@@ -5889,7 +6056,7 @@ var require_mime_node = __commonJS({
       constructor(contentType, options) {
         this.nodeCounter = 0;
         options = options || {};
-        this.baseBoundary = options.baseBoundary || crypto3.randomBytes(8).toString("hex");
+        this.baseBoundary = options.baseBoundary || crypto2.randomBytes(8).toString("hex");
         this.boundaryPrefix = options.boundaryPrefix || "--_NmP";
         this.disableFileAccess = !!options.disableFileAccess;
         this.disableUrlAccess = !!options.disableUrlAccess;
@@ -6832,8 +6999,8 @@ var require_mime_node = __commonJS({
       _generateMessageId() {
         return "<" + [2, 2, 2, 6].reduce(
           // crux to generate UUID-like random strings
-          (prev, len) => prev + "-" + crypto3.randomBytes(len).toString("hex"),
-          crypto3.randomBytes(4).toString("hex")
+          (prev, len) => prev + "-" + crypto2.randomBytes(len).toString("hex"),
+          crypto2.randomBytes(4).toString("hex")
         ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
         (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
       }
@@ -7432,14 +7599,14 @@ var require_relaxed_body = __commonJS({
   "node_modules/nodemailer/lib/dkim/relaxed-body.js"(exports2, module2) {
     "use strict";
     var Transform = __require("stream").Transform;
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     var RelaxedBody = class extends Transform {
       constructor(options) {
         super();
         options = options || {};
         this.chunkBuffer = [];
         this.chunkBufferLen = 0;
-        this.bodyHash = crypto3.createHash(options.hashAlgo || "sha1");
+        this.bodyHash = crypto2.createHash(options.hashAlgo || "sha1");
         this.remainder = "";
         this.byteLength = 0;
         this.debug = options.debug;
@@ -7542,7 +7709,7 @@ var require_sign = __commonJS({
     "use strict";
     var punycode = require_punycode();
     var mimeFuncs = require_mime_funcs();
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     module2.exports = (headers, hashAlgo, bodyHash, options) => {
       options = options || {};
       let defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive";
@@ -7551,7 +7718,7 @@ var require_sign = __commonJS({
       let dkimHeader = generateDKIMHeader(options.domainName, options.keySelector, canonicalizedHeaderData.fieldNames, hashAlgo, bodyHash);
       let signer, signature;
       canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
-      signer = crypto3.createSign(("rsa-" + hashAlgo).toUpperCase());
+      signer = crypto2.createSign(("rsa-" + hashAlgo).toUpperCase());
       signer.update(canonicalizedHeaderData.headers);
       try {
         signature = signer.sign(options.privateKey, "base64");
@@ -7619,7 +7786,7 @@ var require_dkim = __commonJS({
     var PassThrough = __require("stream").PassThrough;
     var fs2 = __require("fs");
     var path3 = __require("path");
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     var DKIM_ALGO = "sha256";
     var MAX_MESSAGE_SIZE = 2 * 1024 * 1024;
     var DKIMSigner = class {
@@ -7632,7 +7799,7 @@ var require_dkim = __commonJS({
         this.chunks = [];
         this.chunklen = 0;
         this.readPos = 0;
-        this.cachePath = this.cacheDir ? path3.join(this.cacheDir, "message." + Date.now() + "-" + crypto3.randomBytes(14).toString("hex")) : false;
+        this.cachePath = this.cacheDir ? path3.join(this.cacheDir, "message." + Date.now() + "-" + crypto2.randomBytes(14).toString("hex")) : false;
         this.cache = false;
         this.headers = false;
         this.bodyHash = false;
@@ -8188,7 +8355,7 @@ var require_mailer = __commonJS({
     var MailMessage = require_mail_message();
     var net = __require("net");
     var dns = __require("dns");
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     var Mail = class extends EventEmitter {
       constructor(transporter2, options, defaults) {
         super();
@@ -8512,7 +8679,7 @@ var require_mailer = __commonJS({
           }
           let cidCounter = 0;
           html = (html || "").toString().replace(/(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;]+);[^"'>\s]+)/gi, (match, prefix, dataUri, mimeType) => {
-            let cid = crypto3.randomBytes(10).toString("hex") + "@localhost";
+            let cid = crypto2.randomBytes(10).toString("hex") + "@localhost";
             if (!mail.data.attachments) {
               mail.data.attachments = [];
             }
@@ -8639,7 +8806,7 @@ var require_smtp_connection = __commonJS({
     var net = __require("net");
     var tls = __require("tls");
     var os = __require("os");
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     var DataStream = require_data_stream();
     var PassThrough = __require("stream").PassThrough;
     var shared = require_shared();
@@ -8650,7 +8817,7 @@ var require_smtp_connection = __commonJS({
     var SMTPConnection = class extends EventEmitter {
       constructor(options) {
         super(options);
-        this.id = crypto3.randomBytes(8).toString("base64").replace(/\W/g, "");
+        this.id = crypto2.randomBytes(8).toString("base64").replace(/\W/g, "");
         this.stage = "init";
         this.options = options || {};
         this.secureConnection = !!this.options.secure;
@@ -9743,7 +9910,7 @@ var require_smtp_connection = __commonJS({
         } else {
           challengeString = challengeMatch[1];
         }
-        let base64decoded = Buffer.from(challengeString, "base64").toString("ascii"), hmacMD5 = crypto3.createHmac("md5", this._auth.credentials.pass);
+        let base64decoded = Buffer.from(challengeString, "base64").toString("ascii"), hmacMD5 = crypto2.createHmac("md5", this._auth.credentials.pass);
         hmacMD5.update(base64decoded);
         let prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
         this._responseActions.push((str2) => {
@@ -10054,7 +10221,7 @@ var require_xoauth2 = __commonJS({
     "use strict";
     var Stream = __require("stream").Stream;
     var nmfetch = require_fetch();
-    var crypto3 = __require("crypto");
+    var crypto2 = __require("crypto");
     var shared = require_shared();
     var XOAuth2 = class extends Stream {
       constructor(options, logger) {
@@ -10345,7 +10512,7 @@ var require_xoauth2 = __commonJS({
        */
       jwtSignRS256(payload) {
         payload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-        let signature = crypto3.createSign("RSA-SHA256").update(payload).sign(this.options.privateKey);
+        let signature = crypto2.createSign("RSA-SHA256").update(payload).sign(this.options.privateKey);
         return payload + "." + this.toBase64URL(signature);
       }
     };
@@ -12520,20 +12687,21 @@ var require_nodemailer = __commonJS({
   }
 });
 
-// server/app.ts
+// build/server-out/server/app.js
+var import_express_mung = __toESM(require_express_mung(), 1);
 import dotenv3 from "dotenv";
 import express3 from "express";
 
-// server/env.ts
+// build/server-out/server/env.js
 import dotenv from "dotenv";
 dotenv.config();
 var env = process.env;
 
-// server/db.ts
+// build/server-out/server/db.js
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-// shared/schema.ts
+// build/server-out/shared/schema.js
 var schema_exports = {};
 __export(schema_exports, {
   insertRaffleSchema: () => insertRaffleSchema,
@@ -16620,7 +16788,7 @@ function p(e2) {
   return m2 || (m2 = external_exports.any()), m2;
 }
 
-// shared/schema.ts
+// build/server-out/shared/schema.js
 var users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -16702,11 +16870,9 @@ var insertWinnerSchema = c(winners).omit({
   announcedAt: true
 });
 
-// server/db.ts
+// build/server-out/server/db.js
 if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to set it in your .env file or environment variables?"
-  );
+  throw new Error("DATABASE_URL must be set. Did you forget to set it in your .env file or environment variables?");
 }
 var connectionString = process.env.DATABASE_URL;
 var client = postgres(connectionString, {
@@ -16722,7 +16888,7 @@ var client = postgres(connectionString, {
 var db = drizzle(client, { schema: schema_exports });
 console.log("Connected to PostgreSQL with SSL");
 
-// server/routes.ts
+// build/server-out/server/routes.js
 var import_passport_local = __toESM(require_lib2(), 1);
 import express2 from "express";
 import passport from "passport";
@@ -16912,21 +17078,17 @@ function fromError(err, options = {}) {
   return toValidationError(options)(err);
 }
 
-// server/btcpayService.ts
-import {
-  InvoicesService,
-  ApiError,
-  InvoiceStatus
-} from "btcpay-greenfield-node-client";
+// build/server-out/server/btcpayService.js
+import { InvoicesService, ApiError, InvoiceStatus } from "btcpay-greenfield-node-client";
 import crypto from "crypto";
 
-// server/vite.ts
+// build/server-out/server/vite.js
 import express from "express";
 import fs from "fs";
 import path2 from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 
-// vite.config.ts
+// build/server-out/vite.config.js
 import { defineConfig } from "vite";
 
 // node_modules/@vitejs/plugin-react/dist/index.mjs
@@ -17342,7 +17504,7 @@ function ensureArray(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-// vite.config.ts
+// build/server-out/vite.config.js
 import path from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 var __filename = fileURLToPath2(import.meta.url);
@@ -17378,7 +17540,7 @@ var vite_config_default = defineConfig({
   }
 });
 
-// server/vite.ts
+// build/server-out/server/vite.js
 import { nanoid } from "nanoid";
 var viteLogger = createLogger();
 function log2(message2, source = "express") {
@@ -17391,7 +17553,7 @@ function log2(message2, source = "express") {
   console.log(`${formattedTime} [${source}] ${message2}`);
 }
 
-// config/btcpay.ts
+// build/server-out/config/btcpay.js
 import dotenv2 from "dotenv";
 import { OpenAPI } from "btcpay-greenfield-node-client";
 dotenv2.config();
@@ -17421,7 +17583,7 @@ var btcpayConfig = {
   // We don't export url and apiKey as they are set globally via OpenAPI
 };
 
-// server/btcpayService.ts
+// build/server-out/server/btcpayService.js
 var CURRENCY = "USD";
 async function createRaffleTicketInvoice(userId, raffleId, ticketId, rafflePrice, raffleName, buyerEmail = void 0) {
   const orderId = `raffle-${raffleId}-ticket-${ticketId}`;
@@ -17485,12 +17647,11 @@ function verifyWebhookSignature(requestBody, signatureHeader) {
   return true;
 }
 
-// server/routes.ts
+// build/server-out/server/routes.js
 var import_csurf = __toESM(require_csurf(), 1);
 import rateLimit from "express-rate-limit";
-import crypto2 from "crypto";
 import helmet from "helmet";
-var usePgSession = process.env.DATABASE_URL;
+var usePgSession = false;
 var Store = usePgSession ? connectPgSimple(session) : MemoryStore(session);
 var sessionStore = usePgSession ? new Store({
   connectionString: process.env.DATABASE_URL,
@@ -17520,7 +17681,7 @@ async function registerRoutes(app2, storageInstance) {
     crossOriginResourcePolicy: false
   }));
   app2.use((req, res, next) => {
-    const origin = req.headers.origin;
+    const requestOrigin = req.headers.origin;
     const allowedOrigins = [
       "https://www.bitmontcg.io",
       "https://bitmontcg.io",
@@ -17532,12 +17693,12 @@ async function registerRoutes(app2, storageInstance) {
       "http://127.0.0.1:3000",
       "http://127.0.0.1:5173"
     ];
-    if (allowedOrigins.includes(origin)) {
-      res.header("Access-Control-Allow-Origin", origin);
+    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+      res.header("Access-Control-Allow-Origin", requestOrigin);
+      res.header("Access-Control-Allow-Credentials", "true");
     }
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token");
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
     if (req.method === "OPTIONS") {
       return res.status(200).end();
     }
@@ -17614,10 +17775,10 @@ async function registerRoutes(app2, storageInstance) {
   });
   app2.use(express2.json());
   app2.use(express2.urlencoded({ extended: false }));
-  const sessionSecret = process.env.SESSION_SECRET || crypto2.randomBytes(32).toString("hex");
-  if (process.env.SESSION_SECRET !== sessionSecret) {
-    console.log("WARNING: Using auto-generated session secret. Set SESSION_SECRET env var for persistent sessions.");
+  if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET must be set in environment variables.");
   }
+  const sessionSecret = process.env.SESSION_SECRET;
   const cookieConfig = {
     secure: false,
     // Set to false to work in both HTTP (dev) and HTTPS (prod) - Vercel handles HTTPS termination
@@ -17627,6 +17788,8 @@ async function registerRoutes(app2, storageInstance) {
     maxAge: 1e3 * 60 * 60 * 24 * 7
     // 1 week
   };
+  console.log("Session store type:", usePgSession ? "PostgreSQL" : "Memory");
+  console.log("DATABASE_URL available:", !!process.env.DATABASE_URL);
   app2.use(session({
     store: sessionStore,
     secret: sessionSecret,
@@ -17639,8 +17802,8 @@ async function registerRoutes(app2, storageInstance) {
   app2.use(passport.initialize());
   app2.use(passport.session());
   const csrfProtectionOptions = {
-    cookie: true
-    // ignoreMethods: ['GET', 'HEAD', 'OPTIONS'], // csurf default ignores these already
+    // Use session store for CSRF tokens (default behavior)
+    // Remove cookie configuration to use session-based tokens
   };
   const csrf = (0, import_csurf.default)(csrfProtectionOptions);
   app2.use((req, res, next) => {
@@ -17651,7 +17814,9 @@ async function registerRoutes(app2, storageInstance) {
   });
   app2.get("/api/csrf-token", (req, res) => {
     if (typeof req.csrfToken === "function") {
-      res.json({ csrfToken: req.csrfToken() });
+      const token = req.csrfToken();
+      console.log("CSRF token generated successfully");
+      res.json({ csrfToken: token });
     } else {
       console.error("CSRF token function not available on request object for /api/csrf-token");
       res.status(500).json({ message: "CSRF token service not available." });
@@ -17681,23 +17846,20 @@ async function registerRoutes(app2, storageInstance) {
       return done(error);
     }
   }));
-  passport.use("admin-strategy", new import_passport_local.Strategy(
-    { usernameField: "username", passwordField: "password" },
-    (username, password, done) => {
-      const adminUsername = process.env.ADMIN_USERNAME;
-      const adminPassword = process.env.ADMIN_PASSWORD;
-      if (!adminUsername || !adminPassword) {
-        console.error("Admin credentials are not set in environment variables.");
-        return done(null, false, { message: "Admin configuration error." });
-      }
-      if (username === adminUsername && password === adminPassword) {
-        const adminUser = { id: "admin_user_id", username: adminUsername, role: "admin" };
-        return done(null, adminUser);
-      } else {
-        return done(null, false, { message: "Incorrect admin username or password." });
-      }
+  passport.use("admin-strategy", new import_passport_local.Strategy({ usernameField: "username", passwordField: "password" }, (username, password, done) => {
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminUsername || !adminPassword) {
+      console.error("Admin credentials are not set in environment variables.");
+      return done(null, false, { message: "Admin configuration error." });
     }
-  ));
+    if (username === adminUsername && password === adminPassword) {
+      const adminUser = { id: "admin_user_id", username: adminUsername, role: "admin" };
+      return done(null, adminUser);
+    } else {
+      return done(null, false, { message: "Incorrect admin username or password." });
+    }
+  }));
   passport.serializeUser((user, done) => {
     done(null, user.id);
   });
@@ -18179,7 +18341,7 @@ async function registerRoutes(app2, storageInstance) {
   console.log("Routes registered successfully for serverless deployment");
 }
 
-// server/emailService.ts
+// build/server-out/server/emailService.js
 var import_nodemailer = __toESM(require_nodemailer(), 1);
 var transporter = import_nodemailer.default.createTransport({
   host: process.env.EMAIL_HOST || "your_email_host",
@@ -18197,9 +18359,7 @@ var transporter = import_nodemailer.default.createTransport({
 });
 var sendWinnerNotification = async (userEmail, username, raffleTitle, cardName, retailPrice, winnerPrice, raffleId) => {
   if (process.env.EMAIL_HOST === "your_email_host" || process.env.EMAIL_USER === "your_email_user" || process.env.EMAIL_PASSWORD === "your_email_password" || !process.env.EMAIL_FROM || process.env.EMAIL_FROM === '"Rafflehub" <noreply@example.com>') {
-    console.log(
-      `Skipping email notification due to placeholder or missing email config. Winner: ${userEmail}, Raffle: ${raffleTitle}, Prize: ${cardName}, RaffleID: ${raffleId}`
-    );
+    console.log(`Skipping email notification due to placeholder or missing email config. Winner: ${userEmail}, Raffle: ${raffleTitle}, Prize: ${cardName}, RaffleID: ${raffleId}`);
     return;
   }
   const subject = `\u{1F389} Congratulations! You've Won the ${cardName} Raffle!`;
@@ -18257,7 +18417,7 @@ var sendWinnerNotification = async (userEmail, username, raffleTitle, cardName, 
   }
 };
 
-// server/DatabaseStorage.ts
+// build/server-out/server/DatabaseStorage.js
 import { eq, and, desc, sql } from "drizzle-orm";
 var DatabaseStorage = class {
   /**
@@ -18269,10 +18429,10 @@ var DatabaseStorage = class {
       const existingUsers = await this.getUsers();
       if (existingUsers.length === 0) {
         const bcrypt2 = await import("bcrypt");
-        const crypto3 = await import("crypto");
+        const crypto2 = await import("crypto");
         const adminUsername = process.env.ADMIN_USERNAME || "admin";
         const adminEmail = process.env.ADMIN_EMAIL || "admin@bitmon.com";
-        const adminPassword = process.env.ADMIN_PASSWORD || crypto3.default.randomBytes(12).toString("hex");
+        const adminPassword = process.env.ADMIN_PASSWORD || crypto2.default.randomBytes(12).toString("hex");
         const hashedPassword = await bcrypt2.default.hash(adminPassword, 10);
         await this.createUser({
           username: adminUsername,
@@ -18368,7 +18528,8 @@ var DatabaseStorage = class {
   async createUser(insertUser) {
     const validatedUser = insertUserSchema.parse(insertUser);
     const [user] = await db.insert(users).values(validatedUser).returning();
-    if (!user) throw new Error("Failed to create user");
+    if (!user)
+      throw new Error("Failed to create user");
     return user;
   }
   async getUsers() {
@@ -18411,7 +18572,8 @@ var DatabaseStorage = class {
       isActive: validatedRaffle.isActive
     };
     const [raffle] = await db.insert(raffles).values(raffleInsert).returning();
-    if (!raffle) throw new Error("Failed to create raffle");
+    if (!raffle)
+      throw new Error("Failed to create raffle");
     return raffle;
   }
   async updateRaffle(id, data) {
@@ -18469,7 +18631,7 @@ var DatabaseStorage = class {
   async createTicket(insertTicket) {
     const validatedTicket = insertTicketSchema.parse(insertTicket);
     const ticket = await db.transaction(async (tx) => {
-      const [raffle] = await tx.select().from(raffles).where(eq(raffles.id, validatedTicket.raffleId)).for('update');
+      const [raffle] = await tx.select().from(raffles).where(eq(raffles.id, validatedTicket.raffleId));
       if (!raffle) {
         throw new Error("Raffle not found");
       }
@@ -18480,11 +18642,10 @@ var DatabaseStorage = class {
       if (!newTicket) {
         throw new Error("Failed to create ticket");
       }
-      // Atomically increment soldTickets
-      await tx.update(raffles).set({ soldTickets: sql`${raffles.soldTickets} + 1` }).where(eq(raffles.id, validatedTicket.raffleId));
       return newTicket;
     });
-    if (!ticket) throw new Error("Transaction failed for ticket creation");
+    if (!ticket)
+      throw new Error("Transaction failed for ticket creation");
     return ticket;
   }
   async getTicketCount(raffleId) {
@@ -18494,7 +18655,7 @@ var DatabaseStorage = class {
   // BTCPay Integration Methods
   async createPendingTicket(raffleId, userId) {
     return await db.transaction(async (tx) => {
-      const [raffle] = await tx.select().from(raffles).where(eq(raffles.id, raffleId)).for('update');
+      const [raffle] = await tx.select().from(raffles).where(eq(raffles.id, raffleId)).limit(1);
       if (!raffle) {
         throw new Error("Raffle not found");
       }
@@ -18512,7 +18673,8 @@ var DatabaseStorage = class {
     return ticket ?? null;
   }
   async getTicketByInvoiceId(invoiceId) {
-    if (!invoiceId) return null;
+    if (!invoiceId)
+      return null;
     const [ticket] = await db.select().from(tickets).where(eq(tickets.btcpayInvoiceId, invoiceId)).limit(1);
     return ticket ?? null;
   }
@@ -18547,7 +18709,8 @@ var DatabaseStorage = class {
   async createWinner(insertWinner) {
     const validatedWinner = insertWinnerSchema.parse(insertWinner);
     const [winner] = await db.insert(winners).values(validatedWinner).returning();
-    if (!winner) throw new Error("Failed to create winner");
+    if (!winner)
+      throw new Error("Failed to create winner");
     return winner;
   }
   async updateWinner(id, winnerUpdate) {
@@ -18602,15 +18765,7 @@ var DatabaseStorage = class {
         return false;
       }
       const cardName = raffle.title;
-      await sendWinnerNotification(
-        user.email,
-        user.username,
-        raffle.title,
-        cardName,
-        raffle.retailPrice,
-        raffle.winnerPrice,
-        raffle.id
-      );
+      await sendWinnerNotification(user.email, user.username, raffle.title, cardName, raffle.retailPrice, raffle.winnerPrice, raffle.id);
       await this.updateWinner(winnerId, {
         announcedAt: /* @__PURE__ */ new Date()
       });
@@ -18623,10 +18778,10 @@ var DatabaseStorage = class {
   }
 };
 
-// server/storage.ts
+// build/server-out/server/storage.js
 var storage = new DatabaseStorage();
 
-// server/app.ts
+// build/server-out/server/app.js
 dotenv3.config();
 process.on("uncaughtException", (err) => {
   console.error(`Uncaught exception: ${err.message}`, "process");
@@ -18637,21 +18792,15 @@ process.on("unhandledRejection", (reason) => {
 var app = express3();
 app.use(express3.json());
 app.use(express3.urlencoded({ extended: false }));
-app.use((req, res, next) => {
+app.use(import_express_mung.default.json(function(body, req, res) {
   const start = Date.now();
   const path3 = req.path;
-  let capturedJsonResponse = void 0;
-  const originalResJson = res.json;
-  res.json = function(bodyJson, ...args2) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args2]);
-  };
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path3.startsWith("/api")) {
       let logLine = `${req.method} ${path3} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (body) {
+        logLine += ` :: ${JSON.stringify(body)}`;
       }
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "\u2026";
@@ -18659,8 +18808,8 @@ app.use((req, res, next) => {
       console.log(logLine);
     }
   });
-  next();
-});
+  return body;
+}));
 var isAppInitialized = false;
 async function initializeApp() {
   if (isAppInitialized) {
