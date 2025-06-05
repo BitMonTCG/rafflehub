@@ -17806,6 +17806,7 @@ async function registerRoutes(app2, storageInstance) {
     // Remove cookie configuration to use session-based tokens
   };
   const csrf = (0, import_csurf.default)(csrfProtectionOptions);
+  app2.use(csrf);
   app2.use((req, res, next) => {
     if (req.path === "/api/btcpay/webhook") {
       return next();
