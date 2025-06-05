@@ -1,3 +1,6 @@
+// Import env configuration FIRST to ensure environment variables are loaded
+import './env.js';
+
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '../shared/schema.js'; // Import from unified PostgreSQL schema

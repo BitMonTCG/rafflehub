@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "rm -rf build api && tsc -p tsconfig.server.json && vite build && esbuild ./build/server-out/server/index.js --platform=node --bundle --format=esm --outfile=api/index.js --external:express --external:dotenv --external:drizzle-orm --external:bcrypt --external:passport --external:express-session --external:connect-pg-simple --external:memorystore --external:btcpay-greenfield-node-client --external:express-rate-limit --external:helmet --external:crypto --external:fs --external:path --external:http --external:ws --external:nanoid --external:vite --external:@babel/* --external:lightningcss --external:fsevents --external:better-sqlite3 --external:sqlite3 --external:pg --external:postgres",
+    "build": "rm -rf build dist && tsc -p tsconfig.server.json && vite build && esbuild ./api/index.ts --platform=node --bundle --format=esm --outfile=api/index.js --external:express --external:dotenv --external:drizzle-orm --external:bcrypt --external:passport --external:express-session --external:connect-pg-simple --external:memorystore --external:btcpay-greenfield-node-client --external:express-rate-limit --external:helmet --external:crypto --external:fs --external:path --external:nanoid --external:vite --external:@babel/* --external:lightningcss --external:fsevents --external:better-sqlite3 --external:sqlite3 --external:pg --external:postgres",
     "start": "NODE_ENV=production node api/index.js",
     "check": "tsc && tsc -p tsconfig.server.json --noEmit",
     "db:generate-pg": "cross-env NODE_ENV=production drizzle-kit generate:pg --config ./drizzle.config.ts",
@@ -116,6 +116,7 @@
     "@types/react-helmet": "^6.1.11",
     "@types/supertest": "^6.0.2",
     "@types/ws": "^8.5.13",
+    "@vercel/node": "^5.2.1",
     "@vitejs/plugin-react": "^4.3.2",
     "@vitest/coverage-v8": "^3.1.3",
     "@vitest/ui": "^3.1.3",

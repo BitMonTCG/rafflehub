@@ -1,6 +1,4 @@
 import type { Express, Request, Response } from "express";
-import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
 import { storage, IStorage } from "./storage.js";
 import { users, insertUserSchema, raffles, insertRaffleSchema, tickets, insertTicketSchema, winners, insertWinnerSchema, User, Winner, Raffle, Ticket, InsertUser } from "./db.js";
 import { z, ZodError } from "zod";
@@ -49,64 +47,50 @@ const sessionStore = usePgSession
       checkPeriod: 86400000 // prune expired entries every 24h
     });
 
-// Global WebSocketServer instance
-let wss: WebSocketServer | null = null;
+// WebSocket functionality disabled for Vercel serverless compatibility
 
 function broadcast(message: any) {
-  if (!wss) {
-    console.log("WebSocket server not initialized, cannot broadcast.");
-    return;
-  }
-  const messageStr = JSON.stringify(message);
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      try {
-         client.send(messageStr);
-      } catch (err) {
-         console.log(`Error sending WebSocket message: ${err}`);
-      }
-    }
-  });
+  // WebSocket functionality disabled for Vercel serverless compatibility
+  // Consider implementing Server-Sent Events (SSE) or using a third-party service
+  console.log("Broadcast attempted (WebSocket disabled):", JSON.stringify(message));
 }
 
 // --- Route Registration ---
-export async function registerRoutes(app: Express, storageInstance: IStorage): Promise<Server> {
-  const httpServer = createServer(app);
+export async function registerRoutes(app: Express, storageInstance: IStorage): Promise<void> {
+  // Note: WebSocket functionality removed for Vercel serverless compatibility
+  // Consider using Server-Sent Events (SSE) or third-party services like Pusher for real-time features
   
-  // Setup WebSocket server
-  wss = new WebSocketServer({ server: httpServer }); 
-  
-  wss.on('connection', (ws) => {
-    console.log('Client connected via WebSocket');
-    // clients.add(ws); // Manage clients if needed for targeted messages
-    
-    ws.on('message', async (message) => {
-       console.log(`Received WebSocket message: ${message}`);
-       try {
-         const data = JSON.parse(message.toString());
-         if (data.type === 'PING') {
-           ws.send(JSON.stringify({ type: 'PONG' }));
-         }
-       } catch (error) {
-         console.log(`Error processing WebSocket message: ${error}`);
-       }
-    });
-    
-    ws.on('close', () => {
-      console.log('Client disconnected from WebSocket');
-      // clients.delete(ws);
-    });
-    ws.on('error', (error) => {
-      console.log(`WebSocket error: ${error}`);
-      // clients.delete(ws);
-    });
-  });
+  console.log('Registering routes for serverless deployment (WebSocket disabled)');
   
   // --- Middleware ---
-  // Security headers (completely disabled for development)
+  // Security headers and CORS configuration
   if (process.env.NODE_ENV === 'production') {
     // Use full Helmet security in production
     app.use(helmet());
+    
+    // Production CORS setup for Vercel deployment
+    app.use((req, res, next) => {
+      const origin = req.headers.origin;
+      const allowedOrigins = [
+        'https://www.bitmontcg.io',
+        'https://bitmontcg.io',
+        'https://rafflehub.vercel.app', // Add your Vercel domain if different
+      ];
+      
+      if (allowedOrigins.includes(origin as string)) {
+        res.header('Access-Control-Allow-Origin', origin);
+      }
+      
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      
+      if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+      }
+      
+      next();
+    });
   } else {
     // In development, apply minimal Helmet settings
     app.use(helmet({
@@ -912,5 +896,5 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       } 
     });
 
-  return httpServer;
+  console.log('Routes registered successfully for serverless deployment');
 }

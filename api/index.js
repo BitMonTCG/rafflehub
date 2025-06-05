@@ -1532,8 +1532,8 @@ var require_cookies = __commonJS({
         if (urlparts.hostname !== cookie.domain && (cookie.domain.charAt(0) !== "." || ("." + urlparts.hostname).substr(-cookie.domain.length) !== cookie.domain)) {
           return false;
         }
-        let path4 = this.getPath(urlparts.pathname);
-        if (path4.substr(0, cookie.path.length) !== cookie.path) {
+        let path3 = this.getPath(urlparts.pathname);
+        if (path3.substr(0, cookie.path.length) !== cookie.path) {
           return false;
         }
         if (cookie.secure && urlparts.protocol !== "https:") {
@@ -1593,16 +1593,16 @@ var require_cookies = __commonJS({
        * @returns {String} Normalized path
        */
       getPath(pathname) {
-        let path4 = (pathname || "/").split("/");
-        path4.pop();
-        path4 = path4.join("/").trim();
-        if (path4.charAt(0) !== "/") {
-          path4 = "/" + path4;
+        let path3 = (pathname || "/").split("/");
+        path3.pop();
+        path3 = path3.join("/").trim();
+        if (path3.charAt(0) !== "/") {
+          path3 = "/" + path3;
         }
-        if (path4.substr(-1) !== "/") {
-          path4 += "/";
+        if (path3.substr(-1) !== "/") {
+          path3 += "/";
         }
-        return path4;
+        return path3;
       }
     };
     module2.exports = Cookies;
@@ -1693,7 +1693,7 @@ var require_fetch = __commonJS({
       let finished = false;
       let cookies;
       let body;
-      let handler = parsed.protocol === "https:" ? https : http;
+      let handler2 = parsed.protocol === "https:" ? https : http;
       let headers = {
         "accept-encoding": "gzip,deflate",
         "user-agent": "nodemailer/" + packageData.version
@@ -1774,7 +1774,7 @@ var require_fetch = __commonJS({
         reqOptions.servername = parsed.hostname;
       }
       try {
-        req = handler.request(reqOptions);
+        req = handler2.request(reqOptions);
       } catch (E) {
         finished = true;
         setImmediate(() => {
@@ -2413,7 +2413,7 @@ var require_shared = __commonJS({
 var require_mime_types = __commonJS({
   "node_modules/nodemailer/lib/mime-funcs/mime-types.js"(exports2, module2) {
     "use strict";
-    var path4 = __require("path");
+    var path3 = __require("path");
     var defaultMimeType = "application/octet-stream";
     var defaultExtension = "bin";
     var mimeTypes = /* @__PURE__ */ new Map([
@@ -4471,7 +4471,7 @@ var require_mime_types = __commonJS({
         if (!filename) {
           return defaultMimeType;
         }
-        let parsed = path4.parse(filename);
+        let parsed = path3.parse(filename);
         let extension = (parsed.ext.substr(1) || parsed.name || "").split("?").shift().trim().toLowerCase();
         let value = defaultMimeType;
         if (extensions.has(extension)) {
@@ -7618,7 +7618,7 @@ var require_dkim = __commonJS({
     var sign = require_sign();
     var PassThrough = __require("stream").PassThrough;
     var fs2 = __require("fs");
-    var path4 = __require("path");
+    var path3 = __require("path");
     var crypto3 = __require("crypto");
     var DKIM_ALGO = "sha256";
     var MAX_MESSAGE_SIZE = 2 * 1024 * 1024;
@@ -7632,7 +7632,7 @@ var require_dkim = __commonJS({
         this.chunks = [];
         this.chunklen = 0;
         this.readPos = 0;
-        this.cachePath = this.cacheDir ? path4.join(this.cacheDir, "message." + Date.now() + "-" + crypto3.randomBytes(14).toString("hex")) : false;
+        this.cachePath = this.cacheDir ? path3.join(this.cacheDir, "message." + Date.now() + "-" + crypto3.randomBytes(14).toString("hex")) : false;
         this.cache = false;
         this.headers = false;
         this.bodyHash = false;
@@ -8924,7 +8924,7 @@ var require_smtp_connection = __commonJS({
           }
         }
         if (this.customAuth.has(this._authMethod)) {
-          let handler = this.customAuth.get(this._authMethod);
+          let handler2 = this.customAuth.get(this._authMethod);
           let lastResponse;
           let returned = false;
           let resolve = () => {
@@ -8952,7 +8952,7 @@ var require_smtp_connection = __commonJS({
             returned = true;
             callback(this._formatError(err, "EAUTH", lastResponse, "AUTH " + this._authMethod));
           };
-          let handlerResponse = handler({
+          let handlerResponse = handler2({
             auth: this._auth,
             method: this._authMethod,
             extensions: [].concat(this._supportedExtensions),
@@ -12520,13 +12520,14 @@ var require_nodemailer = __commonJS({
   }
 });
 
-// build/server-out/server/index.js
+// build/server-out/server/app.js
+import dotenv3 from "dotenv";
 import express3 from "express";
-import dotenv2 from "dotenv";
 
-// build/server-out/server/routes.js
-import { createServer } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+// build/server-out/server/env.js
+import dotenv from "dotenv";
+dotenv.config();
+var env = process.env;
 
 // build/server-out/server/db.js
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -13027,8 +13028,8 @@ function getErrorMap() {
 
 // node_modules/zod/dist/esm/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path3, errorMaps, issueData } = params;
+  const fullPath = [...path3, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -13144,11 +13145,11 @@ var errorUtil;
 
 // node_modules/zod/dist/esm/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path3, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path3;
     this._key = key;
   }
   get path() {
@@ -16644,6 +16645,8 @@ var raffles = pgTable("raffles", {
   // in cents
   winnerPrice: integer("winner_price").notNull(),
   // in cents
+  ticketPrice: integer("ticket_price").notNull(),
+  // in cents
   priceSource: text("price_source"),
   rarity: text("rarity").notNull(),
   psaGrade: integer("psa_grade"),
@@ -16756,11 +16759,11 @@ function isNonEmptyArray(value) {
   return value.length !== 0;
 }
 var identifierRegex = /[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/u;
-function joinPath(path4) {
-  if (path4.length === 1) {
-    return path4[0].toString();
+function joinPath(path3) {
+  if (path3.length === 1) {
+    return path3[0].toString();
   }
-  return path4.reduce((acc, item) => {
+  return path3.reduce((acc, item) => {
     if (typeof item === "number") {
       return acc + "[" + item.toString() + "]";
     }
@@ -17115,19 +17118,19 @@ function viteReact(opts = {}) {
         };
       }
     },
-    configResolved(config2) {
-      projectRoot = config2.root;
-      isProduction2 = config2.isProduction;
-      skipFastRefresh = isProduction2 || config2.command === "build" || config2.server.hmr === false;
+    configResolved(config) {
+      projectRoot = config.root;
+      isProduction2 = config.isProduction;
+      skipFastRefresh = isProduction2 || config.command === "build" || config.server.hmr === false;
       if ("jsxPure" in opts) {
-        config2.logger.warnOnce(
+        config.logger.warnOnce(
           "[@vitejs/plugin-react] jsxPure was removed. You can configure esbuild.jsxSideEffects directly."
         );
       }
-      const hooks = config2.plugins.map((plugin) => plugin.api?.reactBabel).filter(defined);
+      const hooks = config.plugins.map((plugin) => plugin.api?.reactBabel).filter(defined);
       if (hooks.length > 0) {
         runPluginOverrides = (babelOptions, context) => {
-          hooks.forEach((hook) => hook(babelOptions, context, config2));
+          hooks.forEach((hook) => hook(babelOptions, context, config));
         };
       } else if (typeof opts.babel !== "function") {
         staticBabelOptions = createBabelOptions(opts.babel);
@@ -17269,13 +17272,13 @@ function viteReact(opts = {}) {
         }
       }
     },
-    transformIndexHtml(_, config2) {
+    transformIndexHtml(_, config) {
       if (!skipFastRefresh)
         return [
           {
             tag: "script",
             attrs: { type: "module" },
-            children: getPreambleCode(config2.server.config.base)
+            children: getPreambleCode(config.server.config.base)
           }
         ];
     }
@@ -17287,15 +17290,15 @@ function canSkipBabel(plugins, babelOptions) {
   return !(plugins.length || babelOptions.presets.length || babelOptions.configFile || babelOptions.babelrc);
 }
 var loadedPlugin = /* @__PURE__ */ new Map();
-function loadPlugin(path4) {
-  const cached = loadedPlugin.get(path4);
+function loadPlugin(path3) {
+  const cached = loadedPlugin.get(path3);
   if (cached) return cached;
-  const promise = import(path4).then((module2) => {
+  const promise = import(path3).then((module2) => {
     const value = module2.default || module2;
-    loadedPlugin.set(path4, value);
+    loadedPlugin.set(path3, value);
     return value;
   });
-  loadedPlugin.set(path4, promise);
+  loadedPlugin.set(path3, promise);
   return promise;
 }
 function createBabelOptions(rawOptions) {
@@ -17382,65 +17385,11 @@ function log2(message2, source = "express") {
   });
   console.log(`${formattedTime} [${source}] ${message2}`);
 }
-async function setupVite(app2, server) {
-  const serverOptions = {
-    middlewareMode: true,
-    allowedHosts: true
-  };
-  if (vite_config_default.server?.hmr !== false) {
-    serverOptions.hmr = { server };
-  }
-  const vite2 = await createViteServer({
-    ...vite_config_default,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      }
-    },
-    server: serverOptions,
-    appType: "custom"
-  });
-  app2.use(vite2.middlewares);
-  vite2.ws.on("connection", (ws) => {
-    ws.on("error", (err) => {
-      log2(`WebSocket error: ${err.message}`, "vite");
-    });
-  });
-  vite2.ws.on("error", (err) => {
-    log2(`WebSocketServer error: ${err.message}`, "vite");
-  });
-  app2.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
-    try {
-      const clientTemplate = path2.resolve(import.meta.dirname, "..", "client", "index.html");
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(`src="/src/main.tsx"`, `src="/src/main.tsx?v=${nanoid()}"`);
-      const page = await vite2.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e2) {
-      vite2.ssrFixStacktrace(e2);
-      next(e2);
-    }
-  });
-}
-function serveStatic(app2) {
-  const distPath = path2.resolve(import.meta.dirname, "public");
-  if (!fs.existsSync(distPath)) {
-    throw new Error(`Could not find the build directory: ${distPath}, make sure to build the client first`);
-  }
-  app2.use(express.static(distPath));
-  app2.use("*", (_req, res) => {
-    res.sendFile(path2.resolve(distPath, "index.html"));
-  });
-}
 
 // build/server-out/config/btcpay.js
-import dotenv from "dotenv";
+import dotenv2 from "dotenv";
 import { OpenAPI } from "btcpay-greenfield-node-client";
-dotenv.config();
+dotenv2.config();
 var btcpayUrl = process.env.BTCPAY_URL;
 var btcpayApiKey = process.env.BTCPAY_API_KEY;
 var btcpayStoreId = process.env.BTCPAY_STORE_ID;
@@ -17554,48 +17503,32 @@ var sessionStore = usePgSession ? new Store({
   checkPeriod: 864e5
   // prune expired entries every 24h
 });
-var wss = null;
 function broadcast(message2) {
-  if (!wss) {
-    console.log("WebSocket server not initialized, cannot broadcast.");
-    return;
-  }
-  const messageStr = JSON.stringify(message2);
-  wss.clients.forEach((client2) => {
-    if (client2.readyState === WebSocket.OPEN) {
-      try {
-        client2.send(messageStr);
-      } catch (err) {
-        console.log(`Error sending WebSocket message: ${err}`);
-      }
-    }
-  });
+  console.log("Broadcast attempted (WebSocket disabled):", JSON.stringify(message2));
 }
 async function registerRoutes(app2, storageInstance) {
-  const httpServer = createServer(app2);
-  wss = new WebSocketServer({ server: httpServer });
-  wss.on("connection", (ws) => {
-    console.log("Client connected via WebSocket");
-    ws.on("message", async (message2) => {
-      console.log(`Received WebSocket message: ${message2}`);
-      try {
-        const data = JSON.parse(message2.toString());
-        if (data.type === "PING") {
-          ws.send(JSON.stringify({ type: "PONG" }));
-        }
-      } catch (error) {
-        console.log(`Error processing WebSocket message: ${error}`);
-      }
-    });
-    ws.on("close", () => {
-      console.log("Client disconnected from WebSocket");
-    });
-    ws.on("error", (error) => {
-      console.log(`WebSocket error: ${error}`);
-    });
-  });
+  console.log("Registering routes for serverless deployment (WebSocket disabled)");
   if (process.env.NODE_ENV === "production") {
     app2.use(helmet());
+    app2.use((req, res, next) => {
+      const origin = req.headers.origin;
+      const allowedOrigins = [
+        "https://www.bitmontcg.io",
+        "https://bitmontcg.io",
+        "https://rafflehub.vercel.app"
+        // Add your Vercel domain if different
+      ];
+      if (allowedOrigins.includes(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+      }
+      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token");
+      res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+      res.header("Access-Control-Allow-Credentials", "true");
+      if (req.method === "OPTIONS") {
+        return res.status(200).end();
+      }
+      next();
+    });
   } else {
     app2.use(helmet({
       contentSecurityPolicy: false,
@@ -17791,7 +17724,7 @@ async function registerRoutes(app2, storageInstance) {
       if (user) {
         const safeUser = {
           ...user,
-          isAdmin: user.isAdmin === true
+          isAdmin: user.isAdmin === true || user.isAdmin === 1
         };
         console.log(`User deserialized from session: ID=${safeUser.id}, Username=${safeUser.username}, Admin=${safeUser.isAdmin}`);
         done(null, safeUser);
@@ -17830,7 +17763,7 @@ async function registerRoutes(app2, storageInstance) {
         }
         const safeUser = {
           ...user,
-          isAdmin: user.isAdmin === true
+          isAdmin: user.isAdmin === true || user.isAdmin === 1
         };
         console.log("Login successful for:", safeUser.username, "Admin:", safeUser.isAdmin);
         return res.status(200).json(safeUser);
@@ -18223,7 +18156,7 @@ async function registerRoutes(app2, storageInstance) {
       const allRaffles = await storageInstance.getRaffles(false);
       const allWinners = await storageInstance.getWinners();
       const activeRaffles = allRaffles.filter((r2) => r2.isActive).length;
-      const totalRevenue = allRaffles.reduce((sum, r2) => sum + r2.soldTickets * 1, 0);
+      const totalRevenue = allRaffles.reduce((sum, r2) => sum + r2.soldTickets * r2.ticketPrice, 0);
       const totalValueRaffled = allRaffles.reduce((sum, r2) => sum + r2.retailPrice, 0);
       const totalTicketsSold = allRaffles.reduce((sum, r2) => sum + r2.soldTickets, 0);
       const claimedWinners = allWinners.filter((w) => w.claimed).length;
@@ -18246,7 +18179,7 @@ async function registerRoutes(app2, storageInstance) {
       res.status(500).json({ message: "Error fetching statistics" });
     }
   });
-  return httpServer;
+  console.log("Routes registered successfully for serverless deployment");
 }
 
 // build/server-out/server/emailService.js
@@ -18539,12 +18472,17 @@ var DatabaseStorage = class {
   async createTicket(insertTicket) {
     const validatedTicket = insertTicketSchema.parse(insertTicket);
     const ticket = await db.transaction(async (tx) => {
+      const [raffle] = await tx.select().from(raffles).where(eq(raffles.id, validatedTicket.raffleId));
+      if (!raffle) {
+        throw new Error("Raffle not found");
+      }
+      if (raffle.soldTickets >= raffle.totalTickets) {
+        throw new Error("No tickets available for this raffle");
+      }
       const [newTicket] = await tx.insert(tickets).values(validatedTicket).returning();
       if (!newTicket) {
-        tx.rollback();
         throw new Error("Failed to create ticket");
       }
-      await tx.update(raffles).set({ soldTickets: sql`${raffles.soldTickets} + 1` }).where(eq(raffles.id, validatedTicket.raffleId));
       return newTicket;
     });
     if (!ticket)
@@ -18557,6 +18495,13 @@ var DatabaseStorage = class {
   }
   // BTCPay Integration Methods
   async createPendingTicket(raffleId, userId) {
+    const raffle = await this.getRaffle(raffleId);
+    if (!raffle) {
+      throw new Error("Raffle not found");
+    }
+    if (raffle.soldTickets >= raffle.totalTickets) {
+      throw new Error("No tickets available for this raffle");
+    }
     const [ticket] = await db.insert(tickets).values({ raffleId, userId, status: "pending" }).returning();
     return ticket ?? null;
   }
@@ -18673,74 +18618,20 @@ var DatabaseStorage = class {
 // build/server-out/server/storage.js
 var storage = new DatabaseStorage();
 
-// build/server-out/server/btcpayDirectService.js
-import {
-  OpenAPI as OpenAPI2,
-  StoresService,
-  InvoicesService as InvoicesService2
-} from "btcpay-greenfield-node-client";
-import path3 from "path";
-import { fileURLToPath as fileURLToPath3 } from "url";
-var __filename2 = fileURLToPath3(import.meta.url);
-var __dirname2 = path3.dirname(__filename2);
-var config = {
-  apiUrl: process.env.BTCPAY_URL,
-  // Required
-  apiKey: process.env.BTCPAY_API_KEY,
-  // Use API Key
-  storeId: process.env.BTCPAY_STORE_ID
-  // Required Store ID
-};
-var isInitialized = false;
-async function initializeWithApiKey() {
-  if (!config.apiUrl || !config.apiKey || !config.storeId) {
-    log2("BTCPay configuration missing: Requires BTCPAY_URL, BTCPAY_API_KEY, and BTCPAY_STORE_ID in .env");
-    isInitialized = false;
-    return;
-  }
-  try {
-    log2(`Configuring BTCPay Client for URL: ${config.apiUrl} and Store ID: ${config.storeId}`);
-    OpenAPI2.BASE = config.apiUrl;
-    OpenAPI2.TOKEN = config.apiKey;
-    const storeData = await StoresService.storesGetStore({ storeId: config.storeId });
-    if (storeData.id === config.storeId) {
-      log2(`Successfully connected to BTCPay Store: ${storeData.name} (ID: ${storeData.id})`);
-      isInitialized = true;
-    } else {
-      log2(`Error: Could not verify connection to configured Store ID ${config.storeId}. Store ID mismatch or invalid response.`);
-      isInitialized = false;
-    }
-  } catch (error) {
-    log2(`Failed to initialize BTCPay client configuration: ${error.message || error}`);
-    isInitialized = false;
-    if (error.status === 401) {
-      log2("BTCPay API Key is likely invalid or lacks permissions (401 Unauthorized).");
-    } else if (error.status === 403) {
-      log2("BTCPay API Key lacks necessary permissions (403 Forbidden). Required: btcpay.store.canviewstoresettings, etc.");
-    }
-  }
-}
-var initializationPromise = initializeWithApiKey();
-async function checkInitializationStatus() {
-  await initializationPromise;
-  return isInitialized;
-}
-
-// build/server-out/server/index.js
+// build/server-out/server/app.js
+dotenv3.config();
 process.on("uncaughtException", (err) => {
   console.error(`Uncaught exception: ${err.message}`, "process");
 });
 process.on("unhandledRejection", (reason) => {
   console.error(`Unhandled Rejection: ${reason}`, "process");
 });
-dotenv2.config();
 var app = express3();
-var port = process.env.PORT || 5e3;
 app.use(express3.json());
 app.use(express3.urlencoded({ extended: false }));
 app.use((req, res, next) => {
   const start = Date.now();
-  const path4 = req.path;
+  const path3 = req.path;
   let capturedJsonResponse = void 0;
   const originalResJson = res.json;
   res.json = function(bodyJson, ...args2) {
@@ -18749,8 +18640,8 @@ app.use((req, res, next) => {
   };
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path4.startsWith("/api")) {
-      let logLine = `${req.method} ${path4} ${res.statusCode} in ${duration}ms`;
+    if (path3.startsWith("/api")) {
+      let logLine = `${req.method} ${path3} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -18762,51 +18653,50 @@ app.use((req, res, next) => {
   });
   next();
 });
-(async () => {
+var isAppInitialized = false;
+async function initializeApp() {
+  if (isAppInitialized) {
+    return app;
+  }
   try {
-    console.log("Initializing database and sample data...");
-    try {
-      console.log("Database initialization skipped.");
-    } catch (initError) {
-      console.error(`Error initializing database: ${initError}`);
-    }
-    console.log("Checking BTCPay Service status...");
-    const isBtcPayReady = await checkInitializationStatus();
-    if (isBtcPayReady) {
-      console.log("BTCPay Service is Initialized (API connection verified, Store ID obtained).");
-    } else {
-      console.warn("BTCPay Service is NOT fully initialized. Pairing may be required or API check failed.");
-      console.warn("Please use the pairing endpoint if necessary.");
-    }
-    const server = await registerRoutes(app, storage);
-    server.on("upgrade", (request, socket, head) => {
-      socket.on("error", (err) => {
-        console.error(`WebSocket error: ${err.message}`);
-      });
-    });
+    console.log("Database initialization skipped.");
+    console.log("BTCPay Service configuration loaded.");
+    await registerRoutes(app, storage);
     app.use((err, _req, res, _next) => {
       const status = err.status || err.statusCode || 500;
       const message2 = err.message || "Internal Server Error";
       console.error(`Global Error Handler: [${status}] ${message2}`, err.stack ? { stack: err.stack } : { error: err });
       res.status(status).json({ message: message2 });
     });
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else if (!process.env.VERCEL) {
-      serveStatic(app);
-    }
-    server.listen({
-      port,
-      host: "0.0.0.0",
-      reusePort: true
-    }, () => {
-      console.log(`serving on port ${port}`);
-    });
+    isAppInitialized = true;
+    console.log("Express app initialized successfully for serverless deployment");
   } catch (error) {
-    console.error(`Error starting server: ${error}`);
-    process.exit(1);
+    console.error(`Error initializing app: ${error}`);
+    throw error;
   }
-})();
+  return app;
+}
+
+// api/index.ts
+var cachedApp = null;
+async function handler(req, res) {
+  try {
+    if (!cachedApp) {
+      console.log("Initializing Express app for Vercel serverless...");
+      cachedApp = await initializeApp();
+    }
+    return cachedApp(req, res);
+  } catch (error) {
+    console.error("Vercel handler error:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error : void 0
+    });
+  }
+}
+export {
+  handler as default
+};
 /*! Bundled license information:
 
 cookie/index.js:
