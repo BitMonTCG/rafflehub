@@ -4,7 +4,7 @@ import {
   Ticket, InsertTicket, 
   Winner, InsertWinner, 
   users, raffles, tickets, winners 
-} from "@shared/schema";
+} from "./db.js";
 import { sendWinnerNotification } from './emailService.js';
 import { log } from './vite.js';
 
@@ -166,9 +166,14 @@ export class MemStorage implements IStorage {
       endDate,
       winnerId: null,
       createdAt: new Date(),
+      ticketPrice: insertRaffle.ticketPrice ?? 500, // $5.00 default in cents
+      backImageUrl: insertRaffle.backImageUrl ?? null,
+      priceSource: insertRaffle.priceSource ?? null,
+      psaGrade: insertRaffle.psaGrade ?? null,
+      psaCertNumber: insertRaffle.psaCertNumber ?? null,
       series: insertRaffle.series ?? null,
-      cardDetails: (insertRaffle.cardDetails as string[] | null) ?? null,
-      totalTickets: insertRaffle.totalTickets ?? 0,
+      cardDetails: (insertRaffle.cardDetails as string[] | null) ?? [],
+      totalTickets: insertRaffle.totalTickets ?? 100,
       isFeatured: insertRaffle.isFeatured ?? false,
       isActive: insertRaffle.isActive ?? true
     };
@@ -399,6 +404,7 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1628960198207-27ead1f96182?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80",
         retailPrice: 29999, // $299.99
         winnerPrice: 14999, // $149.99
+        ticketPrice: 999, // $9.99
         rarity: "Rare",
         series: "Sword & Shield Series",
         cardDetails: ["PSA Graded 9", "Special Holographic Pattern", "Released in 2021", "Limited Print Run"],
@@ -412,6 +418,7 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1627856013091-fed6e4e30025?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80",
         retailPrice: 24999, // $249.99
         winnerPrice: 12499, // $124.99
+        ticketPrice: 799, // $7.99
         rarity: "Ultra Rare",
         series: "Celebrations",
         cardDetails: ["Mint Condition", "Special 25th Anniversary Edition", "Limited Availability", "Celebrates Pokemon History"],
@@ -425,6 +432,7 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1609845768478-3049829755a7?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80",
         retailPrice: 19999, // $199.99
         winnerPrice: 9999, // $99.99
+        ticketPrice: 599, // $5.99
         rarity: "Legend Rare",
         series: "HeartGold & SoulSilver",
         cardDetails: ["Top Half Only", "Requires Bottom Half to Play", "Holographic", "Collectible LEGEND Series"],
@@ -438,6 +446,7 @@ export class MemStorage implements IStorage {
         imageUrl: "https://images.unsplash.com/photo-1617822626804-9cf6a0422f95?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80",
         retailPrice: 39999, // $399.99
         winnerPrice: 19999, // $199.99
+        ticketPrice: 1299, // $12.99
         rarity: "Ultra Premium",
         series: "Movie Promo",
         cardDetails: ["Sealed in Original Package", "Ancient Hieroglyphic Text", "Movie Promotional Item", "Collector's Item"],

@@ -1,9 +1,9 @@
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import * as pgSchema from '../shared/schema.pg.ts'; // Ensure this path is correct for your PG schema
+import * as schema from '../shared/schema.js'; // Import from unified PostgreSQL schema
 
 // Type export for the schema
-export type PgSchema = typeof pgSchema;
+export type PgSchema = typeof schema;
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -22,11 +22,11 @@ const client = postgres(connectionString, {
   max_lifetime: 60 * 30, // Optional: seconds before closing connections (even if active)
 });
 
-export const db: PostgresJsDatabase<PgSchema> = drizzle(client, { schema: pgSchema });
+export const db: PostgresJsDatabase<PgSchema> = drizzle(client, { schema });
 
 // Export all named exports from the schema module for easy access elsewhere
 // This makes it easy to use your tables, relations, etc.
-export * from '../shared/schema.pg.ts';
+export * from '../shared/schema.js'; // Export from unified PostgreSQL schema
 
 console.log(
   isProduction

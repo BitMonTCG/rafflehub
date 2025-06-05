@@ -1,18 +1,13 @@
 // Removed ts-nocheck to enable proper type checking
 
-import { db, users, raffles, tickets, winners, insertUserSchema, insertRaffleSchema, insertTicketSchema, insertWinnerSchema } from "./db.js";
+import { db } from "./db.js";
+import { 
+  users, raffles, tickets, winners, 
+  insertUserSchema, insertRaffleSchema, insertTicketSchema, insertWinnerSchema,
+  User, InsertUser, Raffle, InsertRaffle, Ticket, InsertTicket, Winner, InsertWinner
+} from "./db.js";
 import { eq, and, desc, sql, gt } from "drizzle-orm";
 import { IStorage } from "./storage.js";
-import type {
-  User,
-  InsertUser,
-  Raffle,
-  InsertRaffle,
-  Ticket,
-  InsertTicket,
-  Winner,
-  InsertWinner,
-} from "../shared/schema.js"; // Keep these type imports if they are distinct and necessary
 import type { PostgresJsDatabase, PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
@@ -336,6 +331,21 @@ export class DatabaseStorage implements IStorage {
     // Start a transaction since we need to update two related tables
     const validatedTicket = insertTicketSchema.parse(insertTicket); // Validate before transaction
     const ticket = await db.transaction(async (tx: PgTransaction<PostgresJsQueryResultHKT, PgSchema, ExtractTablesWithRelations<PgSchema>>) => {
+      // First check if the raffle has available tickets
+      const [raffle] = await tx
+        .select()
+        .from(raffles)
+        .where(eq(raffles.id, validatedTicket.raffleId));
+
+      if (!raffle) {
+        throw new Error("Raffle not found");
+      }
+
+      // Check if the raffle has available tickets
+      if (raffle.soldTickets >= raffle.totalTickets) {
+        throw new Error("No tickets available for this raffle");
+      }
+
       // Create the ticket
       const [newTicket] = await tx
         .insert(tickets)
@@ -343,15 +353,12 @@ export class DatabaseStorage implements IStorage {
         .returning();
 
       if (!newTicket) {
-        tx.rollback();
         throw new Error("Failed to create ticket");
       }
 
-      // Update the raffle's soldTickets count
-      await tx
-        .update(raffles)
-        .set({ soldTickets: sql`${raffles.soldTickets} + 1` })
-        .where(eq(raffles.id, validatedTicket.raffleId));
+      // Only update soldTickets count if the ticket status is 'paid'
+      // Note: The default status from schema is 'pending', so we don't increment here
+      // The increment happens in updateTicketStatus when status changes to 'paid'
 
       return newTicket;
     });
@@ -369,6 +376,17 @@ export class DatabaseStorage implements IStorage {
 
   // BTCPay Integration Methods
   async createPendingTicket(raffleId: number, userId: number): Promise<Ticket | null> {
+    // First check if the raffle has available tickets
+    const raffle = await this.getRaffle(raffleId);
+    if (!raffle) {
+      throw new Error("Raffle not found");
+    }
+    
+    // Check if the raffle has available tickets
+    if (raffle.soldTickets >= raffle.totalTickets) {
+      throw new Error("No tickets available for this raffle");
+    }
+    
     const [ticket] = await db
       .insert(tickets)
       .values({ raffleId, userId, status: 'pending' })

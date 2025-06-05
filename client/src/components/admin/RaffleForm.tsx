@@ -35,6 +35,7 @@ const formSchema = z.object({
   backImageUrl: z.string().url({ message: 'Please enter a valid URL' }).optional().or(z.literal('')),
   retailPrice: z.coerce.number().positive({ message: 'Retail price must be positive' }),
   winnerPrice: z.coerce.number().positive({ message: 'Winner price must be positive' }),
+  ticketPrice: z.coerce.number().positive({ message: 'Ticket price must be positive' }),
   priceSource: z.string().optional(),
   rarity: z.string().min(1, { message: 'Please select a rarity' }),
   psaGrade: z.coerce.number().int().min(1).max(10).optional(),
@@ -54,6 +55,7 @@ interface FormValues {
   backImageUrl?: string;
   retailPrice: number;
   winnerPrice: number;
+  ticketPrice: number;
   priceSource?: string;
   rarity: string;
   psaGrade?: number;
@@ -93,6 +95,7 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
     backImageUrl: raffle?.backImageUrl || '',
     retailPrice: raffle?.retailPrice ? raffle.retailPrice / 100 : undefined,
     winnerPrice: raffle?.winnerPrice ? raffle.winnerPrice / 100 : undefined,
+    ticketPrice: raffle?.ticketPrice ? raffle.ticketPrice / 100 : undefined,
     priceSource: raffle?.priceSource || '',
     rarity: raffle?.rarity || '',
     psaGrade: raffle?.psaGrade || undefined,
@@ -167,6 +170,7 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
         ...data,
         retailPrice: Math.round(data.retailPrice * 100),
         winnerPrice: Math.round(data.winnerPrice * 100),
+        ticketPrice: Math.round(data.ticketPrice * 100),
         // Convert string to array for API
         cardDetails: data.cardDetails.split('\n').filter(s => s.trim().length > 0)
       };
@@ -464,6 +468,22 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
                       </FormControl>
                       <FormDescription>
                         Automatically calculated at 60% of retail price
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="ticketPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ticket Price ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min="0" placeholder="e.g., 5.00" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The price of a single ticket for this raffle.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

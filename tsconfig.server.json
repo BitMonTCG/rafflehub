@@ -1,15 +1,20 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "noEmit": false,
-    "outDir": "./build/server-out",
-    "rootDir": ".",
+    "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "outDir": "./build/server-out",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": false,
-    "jsx": "preserve",
-    "lib": ["esnext"]
+    "noEmit": false,
+    "declaration": false,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["./shared/*"]
+    }
   },
   "include": [
     "server/**/*.ts",
@@ -19,7 +24,6 @@
     "node_modules",
     "client",
     "dist",
-    "build",
     "**/*.test.ts"
   ]
 } 

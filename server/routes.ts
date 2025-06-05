@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage, IStorage } from "./storage.js";
-import { users, insertUserSchema, raffles, insertRaffleSchema, tickets, insertTicketSchema, winners, insertWinnerSchema, User, Winner, Raffle, Ticket, InsertUser } from "../shared/schema.js";
+import { users, insertUserSchema, raffles, insertRaffleSchema, tickets, insertTicketSchema, winners, insertWinnerSchema, User, Winner, Raffle, Ticket, InsertUser } from "./db.js";
 import { z, ZodError } from "zod";
 import express, { NextFunction } from "express";
 import passport from "passport";
@@ -348,7 +348,10 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     }
     const user = await storageInstance.getUserById(numericId);
       if (user) {
-        const safeUser = { ...user, isAdmin: user.isAdmin === true || (user.isAdmin as any) === 1, password: '' } as User;
+        const safeUser = {
+          ...user,
+          isAdmin: user.isAdmin === true || (user.isAdmin as any) === 1
+        } as User;
         console.log(`User deserialized from session: ID=${safeUser.id}, Username=${safeUser.username}, Admin=${safeUser.isAdmin}`);
         done(null, safeUser);
       } else {
@@ -390,8 +393,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
         // Convert isAdmin to proper boolean
         const safeUser = {
           ...user,
-          // Ensure proper type conversion
-          isAdmin: user.isAdmin === true || user.isAdmin === 1
+          isAdmin: user.isAdmin === true || (user.isAdmin as any) === 1
         } as User;
         
         console.log('Login successful for:', safeUser.username, 'Admin:', safeUser.isAdmin);
@@ -750,7 +752,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
         if (!raffle) {
           return res.status(404).json({ message: 'Raffle not found.' });
         }
-        if (!raffle.active) {
+        if (!raffle.isActive) {
           return res.status(400).json({ message: 'This raffle is no longer active.' });
         }
 
@@ -868,11 +870,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   app.get('/api/winners', async (req: Request, res: Response) => {
     try {
       const winnersList = await storageInstance.getWinners();
-      const publicWinners = winnersList.map((w: Winner) => ({
-         ...w,
-         user: w.user ? { id: w.user.id, username: w.user.username } : null
-      }));
-      res.status(200).json(publicWinners);
+      res.status(200).json(winnersList);
     } catch (error) {
       console.log(`Error fetching winners: ${error}`);
       res.status(500).json({ message: "Error fetching winners" });
@@ -886,7 +884,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
         const allWinners = await storageInstance.getWinners();
          
         const activeRaffles = allRaffles.filter((r: Raffle) => r.isActive).length;
-        const totalRevenue = allRaffles.reduce((sum: number, r: Raffle) => sum + (r.soldTickets * 1), 0);
+        const totalRevenue = allRaffles.reduce((sum: number, r: Raffle) => sum + (r.soldTickets * r.ticketPrice), 0);
         const totalValueRaffled = allRaffles.reduce((sum: number, r: Raffle) => sum + r.retailPrice, 0);
         const totalTicketsSold = allRaffles.reduce((sum: number, r: Raffle) => sum + r.soldTickets, 0);
         

@@ -16,7 +16,7 @@ if (isProduction && dbUrl.startsWith('postgres')) {
   // PostgreSQL configuration (Supabase)
   drizzleConfig = {
     out: './drizzle/postgresql', // Separate output directory for pg migrations
-    schema: './shared/schema.pg.ts',
+    schema: './shared/schema.ts',
     dialect: 'postgresql',
     dbCredentials: {
       url: dbUrl,
@@ -27,13 +27,15 @@ if (isProduction && dbUrl.startsWith('postgres')) {
     strict: true,
 };
 } else if (!isProduction) {
-  // SQLite configuration (Development)
+  // PostgreSQL configuration (Development) - Now using PostgreSQL
   drizzleConfig = {
-    out: './drizzle/sqlite', // Separate output directory for sqlite migrations
-    schema: './shared/schema.sqlite.ts',
-    dialect: 'sqlite',
+    out: './drizzle/postgresql', // Using the same output directory as production for consistency
+    schema: './shared/schema.ts', // Pointing to the unified PostgreSQL schema
+    dialect: 'postgresql',        // Changed to postgresql
     dbCredentials: {
-      url: 'sqlite.db', // Or use a URL from .env if you prefer e.g. process.env.SQLITE_DB_PATH
+      url: dbUrl,               // Using DATABASE_URL for PostgreSQL connection
+      // For local development, SSL is typically not required unless your local PG server is configured for it.
+      // If dbUrl includes sslmode, postgres driver should handle it. Otherwise, set ssl: false if needed.
     },
     verbose: true,
     strict: true,

@@ -8,6 +8,13 @@
       "when": 1747280939610,
       "tag": "0000_daily_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1749001046430,
+      "tag": "0001_big_kang",
+      "breakpoints": true
     }
   ]
 }
