@@ -17693,10 +17693,11 @@ async function registerRoutes(app2, storageInstance) {
       "http://127.0.0.1:3000",
       "http://127.0.0.1:5173"
     ];
-    if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
-      res.header("Access-Control-Allow-Origin", requestOrigin);
-      res.header("Access-Control-Allow-Credentials", "true");
-    }
+if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+   res.header("Access-Control-Allow-Origin", requestOrigin);
+  res.header("Vary", "Origin");
+   res.header("Access-Control-Allow-Credentials", "true");
+}
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token");
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
     if (req.method === "OPTIONS") {
