@@ -143,9 +143,9 @@ var require_express_mung = __commonJS({
           return mung2.onError(e2, req, res);
         };
         function headers_async_hook() {
+          let args2 = arguments;
           if (res.headersSent)
             return original.apply(this, args2);
-          let args2 = arguments;
           res.end = () => null;
           try {
             fn2(req, res).then(() => {
