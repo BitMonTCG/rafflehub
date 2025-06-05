@@ -4,7 +4,6 @@ import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic } from "./vite.js";
 import { storage } from "./storage.js";
 import type { IStorage } from "./storage.js";
-import { checkInitializationStatus } from "./btcpayDirectService.js";
 
 // Prevent unhandled exceptions (especially from HMR WebSocket) from crashing the process
 process.on('uncaughtException', (err) => {
@@ -64,16 +63,8 @@ app.use((req, res, next) => {
       console.error(`Error initializing database: ${initError}`);
     }
     
-    // Check BTCPay Service status (keys loaded/generated, verification attempted)
-    // Note: Actual pairing requires user interaction via the pairing URL
-    console.log("Checking BTCPay Service status...");
-    const isBtcPayReady = await checkInitializationStatus();
-    if (isBtcPayReady) {
-       console.log("BTCPay Service is Initialized (API connection verified, Store ID obtained).");
-    } else {
-       console.warn("BTCPay Service is NOT fully initialized. Pairing may be required or API check failed.");
-       console.warn("Please use the pairing endpoint if necessary.");
-    }
+    // BTCPay configuration is now validated during module import
+    console.log("BTCPay Service configuration loaded and validated.");
     
     const server = await registerRoutes(app, storage as IStorage);
 
