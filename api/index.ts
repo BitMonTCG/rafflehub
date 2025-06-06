@@ -4,7 +4,7 @@ import { initializeApp } from '../build/server-out/server/app.js';
 // Initialize the Express app
 const appPromise = initializeApp();
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   // Add comprehensive logging for debugging
   console.log(`🔍 API Request: ${req.method} ${req.url}`);
   console.log(`🔍 Headers:`, JSON.stringify(req.headers, null, 2));
@@ -37,4 +37,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       requestId: req.headers['x-vercel-id'] || 'unknown'
     });
   }
-} 
+}
+
+// Export both as default and named export for compatibility
+export default handler;
+export { handler }; 
