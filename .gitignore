@@ -7,3 +7,4 @@ vite.config.ts.*
 build/
 dist/
 server-out/
+.vercel

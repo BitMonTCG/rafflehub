@@ -201,6 +201,285 @@ var require_express_mung = __commonJS({
   }
 });
 
+// node_modules/cookie-parser/node_modules/cookie/index.js
+var require_cookie = __commonJS({
+  "node_modules/cookie-parser/node_modules/cookie/index.js"(exports2) {
+    "use strict";
+    exports2.parse = parse;
+    exports2.serialize = serialize;
+    var __toString = Object.prototype.toString;
+    var __hasOwnProperty = Object.prototype.hasOwnProperty;
+    var cookieNameRegExp = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+    var cookieValueRegExp = /^("?)[\u0021\u0023-\u002B\u002D-\u003A\u003C-\u005B\u005D-\u007E]*\1$/;
+    var domainValueRegExp = /^([.]?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
+    var pathValueRegExp = /^[\u0020-\u003A\u003D-\u007E]*$/;
+    function parse(str, opt) {
+      if (typeof str !== "string") {
+        throw new TypeError("argument str must be a string");
+      }
+      var obj = {};
+      var len = str.length;
+      if (len < 2) return obj;
+      var dec = opt && opt.decode || decode;
+      var index = 0;
+      var eqIdx = 0;
+      var endIdx = 0;
+      do {
+        eqIdx = str.indexOf("=", index);
+        if (eqIdx === -1) break;
+        endIdx = str.indexOf(";", index);
+        if (endIdx === -1) {
+          endIdx = len;
+        } else if (eqIdx > endIdx) {
+          index = str.lastIndexOf(";", eqIdx - 1) + 1;
+          continue;
+        }
+        var keyStartIdx = startIndex(str, index, eqIdx);
+        var keyEndIdx = endIndex(str, eqIdx, keyStartIdx);
+        var key = str.slice(keyStartIdx, keyEndIdx);
+        if (!__hasOwnProperty.call(obj, key)) {
+          var valStartIdx = startIndex(str, eqIdx + 1, endIdx);
+          var valEndIdx = endIndex(str, endIdx, valStartIdx);
+          if (str.charCodeAt(valStartIdx) === 34 && str.charCodeAt(valEndIdx - 1) === 34) {
+            valStartIdx++;
+            valEndIdx--;
+          }
+          var val = str.slice(valStartIdx, valEndIdx);
+          obj[key] = tryDecode(val, dec);
+        }
+        index = endIdx + 1;
+      } while (index < len);
+      return obj;
+    }
+    function startIndex(str, index, max) {
+      do {
+        var code = str.charCodeAt(index);
+        if (code !== 32 && code !== 9) return index;
+      } while (++index < max);
+      return max;
+    }
+    function endIndex(str, index, min) {
+      while (index > min) {
+        var code = str.charCodeAt(--index);
+        if (code !== 32 && code !== 9) return index + 1;
+      }
+      return min;
+    }
+    function serialize(name, val, opt) {
+      var enc = opt && opt.encode || encodeURIComponent;
+      if (typeof enc !== "function") {
+        throw new TypeError("option encode is invalid");
+      }
+      if (!cookieNameRegExp.test(name)) {
+        throw new TypeError("argument name is invalid");
+      }
+      var value = enc(val);
+      if (!cookieValueRegExp.test(value)) {
+        throw new TypeError("argument val is invalid");
+      }
+      var str = name + "=" + value;
+      if (!opt) return str;
+      if (null != opt.maxAge) {
+        var maxAge = Math.floor(opt.maxAge);
+        if (!isFinite(maxAge)) {
+          throw new TypeError("option maxAge is invalid");
+        }
+        str += "; Max-Age=" + maxAge;
+      }
+      if (opt.domain) {
+        if (!domainValueRegExp.test(opt.domain)) {
+          throw new TypeError("option domain is invalid");
+        }
+        str += "; Domain=" + opt.domain;
+      }
+      if (opt.path) {
+        if (!pathValueRegExp.test(opt.path)) {
+          throw new TypeError("option path is invalid");
+        }
+        str += "; Path=" + opt.path;
+      }
+      if (opt.expires) {
+        var expires = opt.expires;
+        if (!isDate(expires) || isNaN(expires.valueOf())) {
+          throw new TypeError("option expires is invalid");
+        }
+        str += "; Expires=" + expires.toUTCString();
+      }
+      if (opt.httpOnly) {
+        str += "; HttpOnly";
+      }
+      if (opt.secure) {
+        str += "; Secure";
+      }
+      if (opt.partitioned) {
+        str += "; Partitioned";
+      }
+      if (opt.priority) {
+        var priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
+        switch (priority) {
+          case "low":
+            str += "; Priority=Low";
+            break;
+          case "medium":
+            str += "; Priority=Medium";
+            break;
+          case "high":
+            str += "; Priority=High";
+            break;
+          default:
+            throw new TypeError("option priority is invalid");
+        }
+      }
+      if (opt.sameSite) {
+        var sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
+        switch (sameSite) {
+          case true:
+            str += "; SameSite=Strict";
+            break;
+          case "lax":
+            str += "; SameSite=Lax";
+            break;
+          case "strict":
+            str += "; SameSite=Strict";
+            break;
+          case "none":
+            str += "; SameSite=None";
+            break;
+          default:
+            throw new TypeError("option sameSite is invalid");
+        }
+      }
+      return str;
+    }
+    function decode(str) {
+      return str.indexOf("%") !== -1 ? decodeURIComponent(str) : str;
+    }
+    function isDate(val) {
+      return __toString.call(val) === "[object Date]";
+    }
+    function tryDecode(str, decode2) {
+      try {
+        return decode2(str);
+      } catch (e2) {
+        return str;
+      }
+    }
+  }
+});
+
+// node_modules/cookie-signature/index.js
+var require_cookie_signature = __commonJS({
+  "node_modules/cookie-signature/index.js"(exports2) {
+    var crypto2 = __require("crypto");
+    exports2.sign = function(val, secret) {
+      if ("string" != typeof val) throw new TypeError("Cookie value must be provided as a string.");
+      if ("string" != typeof secret) throw new TypeError("Secret string must be provided.");
+      return val + "." + crypto2.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+    };
+    exports2.unsign = function(val, secret) {
+      if ("string" != typeof val) throw new TypeError("Signed cookie string must be provided.");
+      if ("string" != typeof secret) throw new TypeError("Secret string must be provided.");
+      var str = val.slice(0, val.lastIndexOf(".")), mac = exports2.sign(str, secret);
+      return sha1(mac) == sha1(val) ? str : false;
+    };
+    function sha1(str) {
+      return crypto2.createHash("sha1").update(str).digest("hex");
+    }
+  }
+});
+
+// node_modules/cookie-parser/index.js
+var require_cookie_parser = __commonJS({
+  "node_modules/cookie-parser/index.js"(exports2, module2) {
+    "use strict";
+    var cookie = require_cookie();
+    var signature = require_cookie_signature();
+    module2.exports = cookieParser2;
+    module2.exports.JSONCookie = JSONCookie;
+    module2.exports.JSONCookies = JSONCookies;
+    module2.exports.signedCookie = signedCookie;
+    module2.exports.signedCookies = signedCookies;
+    function cookieParser2(secret, options) {
+      var secrets = !secret || Array.isArray(secret) ? secret || [] : [secret];
+      return function cookieParser3(req, res, next) {
+        if (req.cookies) {
+          return next();
+        }
+        var cookies = req.headers.cookie;
+        req.secret = secrets[0];
+        req.cookies = /* @__PURE__ */ Object.create(null);
+        req.signedCookies = /* @__PURE__ */ Object.create(null);
+        if (!cookies) {
+          return next();
+        }
+        req.cookies = cookie.parse(cookies, options);
+        if (secrets.length !== 0) {
+          req.signedCookies = signedCookies(req.cookies, secrets);
+          req.signedCookies = JSONCookies(req.signedCookies);
+        }
+        req.cookies = JSONCookies(req.cookies);
+        next();
+      };
+    }
+    function JSONCookie(str) {
+      if (typeof str !== "string" || str.substr(0, 2) !== "j:") {
+        return void 0;
+      }
+      try {
+        return JSON.parse(str.slice(2));
+      } catch (err) {
+        return void 0;
+      }
+    }
+    function JSONCookies(obj) {
+      var cookies = Object.keys(obj);
+      var key;
+      var val;
+      for (var i2 = 0; i2 < cookies.length; i2++) {
+        key = cookies[i2];
+        val = JSONCookie(obj[key]);
+        if (val) {
+          obj[key] = val;
+        }
+      }
+      return obj;
+    }
+    function signedCookie(str, secret) {
+      if (typeof str !== "string") {
+        return void 0;
+      }
+      if (str.substr(0, 2) !== "s:") {
+        return str;
+      }
+      var secrets = !secret || Array.isArray(secret) ? secret || [] : [secret];
+      for (var i2 = 0; i2 < secrets.length; i2++) {
+        var val = signature.unsign(str.slice(2), secrets[i2]);
+        if (val !== false) {
+          return val;
+        }
+      }
+      return false;
+    }
+    function signedCookies(obj, secret) {
+      var cookies = Object.keys(obj);
+      var dec;
+      var key;
+      var ret = /* @__PURE__ */ Object.create(null);
+      var val;
+      for (var i2 = 0; i2 < cookies.length; i2++) {
+        key = cookies[i2];
+        val = obj[key];
+        dec = signedCookie(val, secret);
+        if (val !== dec) {
+          ret[key] = dec;
+          delete obj[key];
+        }
+      }
+      return ret;
+    }
+  }
+});
+
 // node_modules/passport-strategy/lib/strategy.js
 var require_strategy = __commonJS({
   "node_modules/passport-strategy/lib/strategy.js"(exports2, module2) {
@@ -308,7 +587,7 @@ var require_lib2 = __commonJS({
 });
 
 // node_modules/csurf/node_modules/cookie/index.js
-var require_cookie = __commonJS({
+var require_cookie2 = __commonJS({
   "node_modules/csurf/node_modules/cookie/index.js"(exports2) {
     "use strict";
     exports2.parse = parse;
@@ -1210,27 +1489,6 @@ var require_http_errors = __commonJS({
   }
 });
 
-// node_modules/cookie-signature/index.js
-var require_cookie_signature = __commonJS({
-  "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto2 = __require("crypto");
-    exports2.sign = function(val, secret) {
-      if ("string" != typeof val) throw new TypeError("Cookie value must be provided as a string.");
-      if ("string" != typeof secret) throw new TypeError("Secret string must be provided.");
-      return val + "." + crypto2.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
-    };
-    exports2.unsign = function(val, secret) {
-      if ("string" != typeof val) throw new TypeError("Signed cookie string must be provided.");
-      if ("string" != typeof secret) throw new TypeError("Secret string must be provided.");
-      var str = val.slice(0, val.lastIndexOf(".")), mac = exports2.sign(str, secret);
-      return sha1(mac) == sha1(val) ? str : false;
-    };
-    function sha1(str) {
-      return crypto2.createHash("sha1").update(str).digest("hex");
-    }
-  }
-});
-
 // node_modules/rndm/index.js
 var require_rndm = __commonJS({
   "node_modules/rndm/index.js"(exports2, module2) {
@@ -1444,7 +1702,7 @@ var require_csrf = __commonJS({
 var require_csurf = __commonJS({
   "node_modules/csurf/index.js"(exports2, module2) {
     "use strict";
-    var Cookie = require_cookie();
+    var Cookie = require_cookie2();
     var createError = require_http_errors();
     var sign = require_cookie_signature().sign;
     var Tokens = require_csrf();
@@ -12689,6 +12947,7 @@ var require_nodemailer = __commonJS({
 
 // build/server-out/server/app.js
 var import_express_mung = __toESM(require_express_mung(), 1);
+var import_cookie_parser = __toESM(require_cookie_parser(), 1);
 import dotenv3 from "dotenv";
 import express3 from "express";
 
@@ -17700,11 +17959,46 @@ if (usePgSession) {
   });
 }
 var sessionStore = sessionStoreInstance;
+var csrfProtection = (0, import_csurf.default)({
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    // Use secure cookies in production
+    sameSite: "strict"
+  }
+});
 function broadcast(message2) {
   console.log("Broadcast attempted (WebSocket disabled):", JSON.stringify(message2));
 }
 async function registerRoutes(app2, storageInstance) {
   console.log("Registering routes for serverless deployment (WebSocket disabled)");
+  const usePgSession2 = false;
+  const Store = usePgSession2 ? connectPgSimple(session) : MemoryStore(session);
+  const sessionStoreInstance2 = usePgSession2 ? new Store({
+    connectionString: process.env.DATABASE_URL,
+    tableName: "user_sessions",
+    createTableIfMissing: true,
+    ssl: true,
+    pool: { max: 10, idleTimeoutMillis: 3e4 }
+  }) : new Store({ checkPeriod: 864e5 });
+  app2.use(session({
+    store: sessionStoreInstance2,
+    secret: process.env.SESSION_SECRET || "default_fallback_secret_CHANGE_ME",
+    // IMPORTANT: Use a strong secret from env
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1e3
+      // 1 day
+    }
+  }));
+  app2.use(csrfProtection);
+  app2.get("/api/csrf-token", (req, res) => {
+    res.json({ csrfToken: req.csrfToken() });
+  });
   app2.use(helmet({
     contentSecurityPolicy: false,
     // Disabled for frontend compatibility
@@ -17819,7 +18113,7 @@ async function registerRoutes(app2, storageInstance) {
     maxAge: 1e3 * 60 * 60 * 24 * 7
     // 1 week
   };
-  console.log("Session store type:", usePgSession ? "PostgreSQL" : "Memory");
+  console.log("Session store type:", usePgSession2 ? "PostgreSQL" : "Memory");
   console.log("DATABASE_URL available:", !!process.env.DATABASE_URL);
   app2.use(session({
     store: sessionStore,
@@ -17849,7 +18143,7 @@ async function registerRoutes(app2, storageInstance) {
       status: "healthy",
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
       environment: process.env.VERCEL_ENV || "unknown",
-      sessionStore: usePgSession ? "postgresql" : "memory"
+      sessionStore: usePgSession2 ? "postgresql" : "memory"
     });
   });
   app2.get("/api/csrf-token", (req, res) => {
@@ -18379,7 +18673,15 @@ async function registerRoutes(app2, storageInstance) {
       res.status(500).json({ message: "Error fetching statistics" });
     }
   });
-  console.log("Routes registered successfully for serverless deployment");
+  app2.use((err, req, res, next) => {
+    if (err.code === "EBADCSRFTOKEN") {
+      console.warn("Invalid CSRF token detected:", { path: req.path, method: req.method, ip: req.ip });
+      res.status(403).json({ message: "Invalid CSRF token. Please refresh and try again." });
+    } else {
+      next(err);
+    }
+  });
+  console.log("Routes registered successfully with CSRF protection for serverless deployment");
 }
 
 // build/server-out/server/emailService.js
@@ -18831,6 +19133,7 @@ process.on("unhandledRejection", (reason) => {
   console.error(`Unhandled Rejection: ${reason}`, "process");
 });
 var app = express3();
+app.use((0, import_cookie_parser.default)());
 app.use(express3.json());
 app.use(express3.urlencoded({ extended: false }));
 app.use(import_express_mung.default.json(function(body, req, res) {
@@ -18915,9 +19218,18 @@ export {
 /*! Bundled license information:
 
 cookie/index.js:
+cookie/index.js:
   (*!
    * cookie
    * Copyright(c) 2012-2014 Roman Shtylman
+   * Copyright(c) 2015 Douglas Christopher Wilson
+   * MIT Licensed
+   *)
+
+cookie-parser/index.js:
+  (*!
+   * cookie-parser
+   * Copyright(c) 2014 TJ Holowaychuk
    * Copyright(c) 2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
