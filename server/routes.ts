@@ -137,15 +137,20 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     })
   );
 
-  // Apply csurf middleware to all subsequent routes
-  app.use(csrfProtection);
-
   // --- CSRF Token Route ---
+  // IMPORTANT: This route MUST be defined BEFORE global CSRF protection is applied
   app.get('/api/csrf-token', (req: Request, res: Response) => {
+    // Ensure session is established before generating CSRF token
+    if (!req.session) {
+      console.error('Session not available for CSRF token generation. Ensure session middleware is correctly configured and runs before this route.');
+      return res.status(500).json({ message: 'Session not available for CSRF token.' });
+    }
     res.json({ csrfToken: req.csrfToken() });
   });
 
-  
+  // Apply csurf middleware to all subsequent routes
+  app.use(csrfProtection);
+
   // --- Middleware ---
   // Security headers and CORS configuration
   // Use production-ready security settings
