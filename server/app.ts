@@ -4,6 +4,7 @@ dotenv.config();
 
 import express from "express";
 import mung from "express-mung"; // Added import for express-mung
+import cookieParser from 'cookie-parser';
 import { registerRoutes } from "./routes.js";
 import { storage } from "./storage.js";
 import type { IStorage } from "./storage.js";
@@ -19,6 +20,7 @@ process.on('unhandledRejection', (reason) => {
 const app = express();
 
 // Global middleware
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

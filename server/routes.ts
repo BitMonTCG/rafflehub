@@ -49,6 +49,16 @@ const sessionStore = usePgSession
 
 // WebSocket functionality disabled for Vercel serverless compatibility
 
+// Initialize csurf protection
+// IMPORTANT: csurf middleware must come AFTER session middleware and cookie-parser
+const csrfProtection = csurf({
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    sameSite: 'strict',
+  }
+});
+
 function broadcast(message: any) {
   // WebSocket functionality disabled for Vercel serverless compatibility
   // Consider implementing Server-Sent Events (SSE) or using a third-party service
@@ -61,6 +71,46 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   // Consider using Server-Sent Events (SSE) or third-party services like Pusher for real-time features
   
   console.log('Registering routes for serverless deployment (WebSocket disabled)');
+
+  // Session middleware
+  const usePgSession = false; // As per existing logic, but ensure SESSION_SECRET is strong
+  const Store = usePgSession
+    ? connectPgSimple(session)
+    : MemoryStore(session);
+
+  const sessionStoreInstance = usePgSession
+    ? new (Store as any)({
+        connectionString: process.env.DATABASE_URL,
+        tableName: 'user_sessions',
+        createTableIfMissing: true,
+        ssl: true,
+        pool: { max: 10, idleTimeoutMillis: 30000 }
+      })
+    : new (Store as any)({ checkPeriod: 86400000 });
+
+  app.use(
+    session({
+      store: sessionStoreInstance,
+      secret: process.env.SESSION_SECRET || "default_fallback_secret_CHANGE_ME", // IMPORTANT: Use a strong secret from env
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000 // 1 day
+      },
+    })
+  );
+
+  // Apply csurf middleware to all subsequent routes
+  app.use(csrfProtection);
+
+  // --- CSRF Token Route ---
+  app.get('/api/csrf-token', (req: Request, res: Response) => {
+    res.json({ csrfToken: req.csrfToken() });
+  });
+
   
   // --- Middleware ---
   // Security headers and CORS configuration
@@ -878,5 +928,15 @@ const sessionSecret = process.env.SESSION_SECRET;
       } 
     });
 
-  console.log('Routes registered successfully for serverless deployment');
+  // CSRF Error Handler - place it after all routes that use CSRF, or before a generic error handler
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+      console.warn('Invalid CSRF token detected:', { path: req.path, method: req.method, ip: req.ip });
+      res.status(403).json({ message: 'Invalid CSRF token. Please refresh and try again.' });
+    } else {
+      next(err);
+    }
+  });
+
+  console.log('Routes registered successfully with CSRF protection for serverless deployment');
 }
