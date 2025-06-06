@@ -17,6 +17,7 @@ import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import helmet from 'helmet';
 import csurf from 'csurf'; // Import csurf
+import { Pool } from 'pg'; // Import Pool from pg
 
 // Define a simple interface for the expected webhook payload structure
 interface BtcPayWebhookPayload {
@@ -26,26 +27,59 @@ interface BtcPayWebhookPayload {
   metadata?: { [key: string]: any };
 }
 
-// Setup session store - use memory store for development to avoid PG session store issues
-const usePgSession = false; // Temporarily use memory store
-const Store = usePgSession
-  ? connectPgSimple(session)
-  : MemoryStore(session);
+// Setup session store
+// Use PostgreSQL for session storage on Vercel (production & preview), MemoryStore for local development.
+const vercelEnv = process.env.VERCEL_ENV; // 'production', 'preview', or 'development'
+const usePgSession = vercelEnv === 'production' || vercelEnv === 'preview';
+const isProduction = vercelEnv === 'production';
 
-const sessionStore = usePgSession
-  ? new (Store as any)({
+if (isProduction && !usePgSession) {
+  console.error("CRITICAL ERROR: Attempting to use MemoryStore in production. Exiting.");
+  process.exit(1); // Exit immediately to prevent running with MemoryStore
+}
+
+console.log(`Session store: ${usePgSession ? 'PostgreSQL (connect-pg-simple)' : 'MemoryStore (memorystore)'} (VERCEL_ENV=${vercelEnv})`);
+
+const PgSessionStore = connectPgSimple(session);
+const InMemoryStore = MemoryStore(session);
+
+let sessionStoreInstance;
+
+if (usePgSession) {
+  try {
+    const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
+      ssl: isProduction ? { rejectUnauthorized: false } : false, // SSL config for pg.Pool
+      max: 10, // Maximum number of clients in the pool
+      idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+    });
+    
+    // Test the connection in background, don't await
+    pool.query('SELECT NOW()').then(() => {
+      console.log('✅ PostgreSQL connection successful');
+    }).catch((error) => {
+      console.warn('⚠️  PostgreSQL connection test failed:', error);
+    });
+    
+    sessionStoreInstance = new PgSessionStore({
+      pool: pool, // Pass the pre-configured pool
       tableName: 'user_sessions',
       createTableIfMissing: true,
-      ssl: true, // Always use SSL for PostgreSQL connections
-      pool: {
-        max: 10, // Maximum number of clients in the pool
-        idleTimeoutMillis: 30000 // Close idle clients after 30 seconds
-      }
-    })
-  : new (Store as any)({
+    });
+  } catch (error) {
+    console.error('❌ PostgreSQL session store failed, falling back to MemoryStore:', error);
+    console.warn('⚠️  This may cause session issues in serverless environment');
+    sessionStoreInstance = new InMemoryStore({
       checkPeriod: 86400000 // prune expired entries every 24h
     });
+  }
+} else {
+  sessionStoreInstance = new InMemoryStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  });
+}
+
+const sessionStore = sessionStoreInstance;
 
 // WebSocket functionality disabled for Vercel serverless compatibility
 
@@ -278,15 +312,27 @@ const sessionSecret = process.env.SESSION_SECRET;
     csrf(req, res, next);
   });
   
+  // Health check endpoint (must be before CSRF middleware)
+  app.get('/api/health', (req: Request, res: Response) => {
+    console.log('✅ Health check requested');
+    res.json({ 
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      environment: process.env.VERCEL_ENV || 'unknown',
+      sessionStore: usePgSession ? 'postgresql' : 'memory'
+    });
+  });
+
   // Route to get CSRF token for client-side use
   app.get('/api/csrf-token', (req: Request, res: Response) => {
+    console.log('🔑 CSRF token requested');
     // req.csrfToken() is added by csurf middleware
     if (typeof (req as any).csrfToken === 'function') {
       const token = (req as any).csrfToken();
-      console.log('CSRF token generated successfully');
+      console.log('✅ CSRF token generated successfully');
       res.json({ csrfToken: token });
     } else {
-      console.error('CSRF token function not available on request object for /api/csrf-token');
+      console.error('❌ CSRF token function not available on request object for /api/csrf-token');
       res.status(500).json({ message: 'CSRF token service not available.' });
     }
   });

@@ -58,34 +58,40 @@ let isAppInitialized = false;
 
 async function initializeApp() {
   if (isAppInitialized) {
+    console.log("✅ App already initialized, returning existing instance");
     return app;
   }
 
+  console.log("🚀 Starting Express app initialization...");
+
   try {
     // Initialize database with sample data (commented out to prevent seeding)
-    console.log("Database initialization skipped.");
+    console.log("📊 Database initialization skipped.");
     
     // BTCPay configuration is loaded via btcpayConfig module
-    console.log("BTCPay Service configuration loaded.")
+    console.log("💰 BTCPay Service configuration loaded.")
     
     // Register routes without creating HTTP server
+    console.log("🛣️  Registering routes...");
     await registerRoutes(app, storage as IStorage);
+    console.log("✅ Routes registered successfully");
     
     // Global error handler
     app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
 
-      console.error(`Global Error Handler: [${status}] ${message}`, err.stack ? { stack: err.stack } : { error: err });
+      console.error(`❌ Global Error Handler: [${status}] ${message}`, err.stack ? { stack: err.stack } : { error: err });
 
       res.status(status).json({ message });
     });
 
     isAppInitialized = true;
-    console.log("Express app initialized successfully for serverless deployment");
+    console.log("✅ Express app initialized successfully for serverless deployment");
     
   } catch (error) {
-    console.error(`Error initializing app: ${error}`);
+    console.error(`❌ Error initializing app:`, error);
+    console.error(`❌ Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
     throw error;
   }
 
