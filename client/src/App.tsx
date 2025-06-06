@@ -18,6 +18,8 @@ import HowToBuyCrypto from "@/pages/HowToBuyCrypto";
 import { useEffect } from "react";
 import { webSocketService } from "@/lib/websocket";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { AuthProvider } from '@/contexts/AuthContext';
+import { SocketProvider } from '@/contexts/SocketContext';
 
 function Router() {
   return (
@@ -40,26 +42,30 @@ function Router() {
 }
 
 function App() {
-  // Connect to WebSocket on mount
-  useEffect(() => {
-    webSocketService.connect();
-    
-    return () => {
-      webSocketService.disconnect();
-    };
-  }, []);
+  // Remove WebSocket connection - now handled in SocketProvider
+  // useEffect(() => {
+  //   webSocketService.connect();
+  //   
+  //   return () => {
+  //     webSocketService.disconnect();
+  //   };
+  // }, []);
 
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <div className="flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-grow">
-            <Router />
-          </main>
-          <Footer />
-        </div>
-        <Toaster />
+        <AuthProvider>
+          <SocketProvider>
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow">
+                <Router />
+              </main>
+              <Footer />
+            </div>
+            <Toaster />
+          </SocketProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

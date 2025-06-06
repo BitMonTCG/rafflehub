@@ -9,6 +9,7 @@ interface SocketContextValue {
   raffles: Raffle[];
   winners: Winner[];
   latestMessage: SocketMessage | null;
+  isWebSocketEnabled: boolean;
 }
 
 const SocketContext = createContext<SocketContextValue>({
@@ -16,6 +17,7 @@ const SocketContext = createContext<SocketContextValue>({
   raffles: [],
   winners: [],
   latestMessage: null,
+  isWebSocketEnabled: false,
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -25,10 +27,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [winners, setWinners] = useState<Winner[]>([]);
   const [latestMessage, setLatestMessage] = useState<SocketMessage | null>(null);
+  const [isWebSocketEnabled, setIsWebSocketEnabled] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Connect to WebSocket
+    // Check if WebSocket is enabled for this environment
+    const wsEnabled = webSocketService.isEnabled();
+    setIsWebSocketEnabled(wsEnabled);
+    
+    if (!wsEnabled) {
+      console.log('SocketProvider: WebSocket disabled, using polling fallback');
+      // In production without WebSocket, we could implement polling here
+      // For now, just log and continue without real-time updates
+      return;
+    }
+
+    // Connect to WebSocket only if enabled
     webSocketService.connect();
     
     // Handle initial data
@@ -122,7 +136,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [toast]);
 
   return (
-    <SocketContext.Provider value={{ connected, raffles, winners, latestMessage }}>
+    <SocketContext.Provider value={{ 
+      connected: isWebSocketEnabled ? connected : false, 
+      raffles, 
+      winners, 
+      latestMessage,
+      isWebSocketEnabled 
+    }}>
       {children}
     </SocketContext.Provider>
   );

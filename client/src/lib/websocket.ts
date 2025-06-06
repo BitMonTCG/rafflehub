@@ -5,8 +5,39 @@ class WebSocketService {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private listeners: { [key: string]: ((data: any) => void)[] } = {};
   private isConnecting: boolean = false;
+  private isWebSocketEnabled: boolean = false;
+
+  constructor() {
+    // Only enable WebSocket in development or when explicitly enabled
+    this.isWebSocketEnabled = this.checkWebSocketAvailability();
+  }
+
+  private checkWebSocketAvailability(): boolean {
+    // Check if we're in development mode
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1' ||
+                         window.location.hostname.includes('localhost');
+    
+    // Check if WebSocket is available (not on serverless)
+    const hasWebSocketSupport = typeof WebSocket !== 'undefined';
+    
+    // Log the decision for debugging
+    console.log('WebSocket availability check:', {
+      isDevelopment,
+      hasWebSocketSupport,
+      hostname: window.location.hostname,
+      enabled: isDevelopment && hasWebSocketSupport
+    });
+    
+    return isDevelopment && hasWebSocketSupport;
+  }
 
   connect(): void {
+    if (!this.isWebSocketEnabled) {
+      console.log('WebSocket disabled for this environment');
+      return;
+    }
+    
     if (this.socket || this.isConnecting) return;
     
     this.isConnecting = true;
@@ -15,6 +46,7 @@ class WebSocketService {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}/ws`;
       
+      console.log('Attempting WebSocket connection to:', wsUrl);
       this.socket = new WebSocket(wsUrl);
       
       this.socket.onopen = () => {
@@ -46,7 +78,9 @@ class WebSocketService {
         console.log("WebSocket disconnected");
         this.socket = null;
         this.isConnecting = false;
-        this.scheduleReconnect();
+        if (this.isWebSocketEnabled) {
+          this.scheduleReconnect();
+        }
       };
       
       this.socket.onerror = (error) => {
@@ -57,17 +91,19 @@ class WebSocketService {
     } catch (error) {
       console.error("Error connecting to WebSocket:", error);
       this.isConnecting = false;
-      this.scheduleReconnect();
+      if (this.isWebSocketEnabled) {
+        this.scheduleReconnect();
+      }
     }
   }
 
   private scheduleReconnect(): void {
-    if (!this.reconnectTimer) {
-      this.reconnectTimer = setTimeout(() => {
-        this.reconnectTimer = null;
-        this.connect();
-      }, 3000);
-    }
+    if (!this.isWebSocketEnabled || this.reconnectTimer) return;
+    
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, 3000);
   }
   
   private heartbeat(): void {
@@ -107,6 +143,11 @@ class WebSocketService {
     }
     
     this.listeners = {};
+  }
+
+  // Add method to check if WebSocket is enabled
+  isEnabled(): boolean {
+    return this.isWebSocketEnabled;
   }
 }
 
