@@ -1,0 +1,29 @@
+# Ignore files and directories from Vercel deployments
+
+# Server-specific files not needed in production bundle
+server/vite.ts
+
+# Optionally, also ignore the compiled output if it's not needed elsewhere
+# build/server-out/server/vite.js
+
+# Common ignores
+.DS_Store
+*.env
+*.env.*
+!*.env.example
+!*.env.production
+
+# Node modules (Vercel handles dependencies from package.json)
+node_modules/
+
+# Build outputs if Vercel rebuilds them anyway or they are not needed
+# build/
+# dist/
+
+# Git stuff
+.git/
+.gitignore
+
+# Local development tools / IDE specific
+.vscode/
+*.code-workspace
