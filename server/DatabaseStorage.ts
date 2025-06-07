@@ -13,7 +13,7 @@ import type { PgTransaction } from 'drizzle-orm/pg-core';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
 import { type PgSchema } from './db.js'; // Import PgSchema type from db.ts
 import { sendWinnerNotification } from './emailService.js';
-import { log } from './vite.js';
+import { log } from './utils/logger.js';
 
 // The 'db' and table objects (users, raffles, tickets, winners) are already imported on line 2.
 // No need for DBSchema or DBInstance type aliases if we use db and table objects directly with their imported types.

@@ -6,7 +6,7 @@ import {
   users, raffles, tickets, winners 
 } from "./db.js";
 import { sendWinnerNotification } from './emailService.js';
-import { log } from './vite.js';
+import { log } from './utils/logger.js';
 
 export interface IStorage {
   // Database initialization

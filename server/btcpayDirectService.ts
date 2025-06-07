@@ -1,4 +1,4 @@
-import { log } from './vite.js';
+import { log } from './utils/logger.js';
 // Import necessary services and types from btcpay-greenfield-node-client
 import { 
     InvoicesService, 
