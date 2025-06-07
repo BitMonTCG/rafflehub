@@ -165,17 +165,26 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
 
   // --- CSRF Token Route ---
   // IMPORTANT: This route MUST be defined BEFORE global CSRF protection is applied
-  app.get('/api/csrf-token', (req: Request, res: Response) => {
+  // However, we need to apply the csrfProtection middleware to this specific route
+  app.get('/api/csrf-token', csrfProtection, (req: Request, res: Response) => {
     // Ensure session is established before generating CSRF token
     if (!req.session) {
       console.error('Session not available for CSRF token generation. Ensure session middleware is correctly configured and runs before this route.');
       return res.status(500).json({ message: 'Session not available for CSRF token.' });
     }
-    res.json({ csrfToken: req.csrfToken() });
+    try {
+      const token = req.csrfToken();
+      console.log('✅ CSRF token generated successfully');
+      res.json({ csrfToken: token });
+    } catch (error) {
+      console.error('❌ Error generating CSRF token:', error);
+      res.status(500).json({ message: 'Failed to generate CSRF token' });
+    }
   });
 
-  // Apply csurf middleware to all subsequent routes
-  app.use(csrfProtection);
+  // Apply csurf middleware selectively to routes that need protection
+  // Rather than globally applying it, we'll apply it to specific routes that need it
+  // This gives us more control and avoids issues with certain routes
 
   // --- Middleware ---
   // Security headers and CORS configuration
@@ -339,26 +348,15 @@ const sessionSecret = process.env.SESSION_SECRET;
       // Skip CSRF for webhook route only
       return next();
     }
-    // Apply CSRF to all other routes (including GET for token generation)
-    csrf(req, res, next);
+    // Apply CSRF to routes that need protection
+    // Use the proper csrfProtection middleware instance
+    csrfProtection(req, res, next);
   });
   
   // Health check endpoint is already defined at the top of the route registration
   // to ensure it's available before the CSRF middleware
 
-  // Route to get CSRF token for client-side use
-  app.get('/api/csrf-token', (req: Request, res: Response) => {
-    console.log('🔑 CSRF token requested');
-    // req.csrfToken() is added by csurf middleware
-    if (typeof (req as any).csrfToken === 'function') {
-      const token = (req as any).csrfToken();
-      console.log('✅ CSRF token generated successfully');
-      res.json({ csrfToken: token });
-    } else {
-      console.error('❌ CSRF token function not available on request object for /api/csrf-token');
-      res.status(500).json({ message: 'CSRF token service not available.' });
-    }
-  });
+  // CSRF token route is already defined above
   
   // CSRF Error Handler (must be after CSRF middleware and before other error handlers)
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
