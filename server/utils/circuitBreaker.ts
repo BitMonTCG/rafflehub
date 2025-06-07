@@ -122,9 +122,8 @@ export class CircuitBreaker {
            !this.inHalfOpenProbe;
   }
 
-  private async tryHalfOpen<T>(fn: CancellableFunction<T>, fallback?: CancellableFunction<T>): Promise<T> {
-    this.successCount = 0; // Reset success count when entering HALF_OPEN state
-    this.halfOpenCalls++;
+private async tryHalfOpen<T>(fn: CancellableFunction<T>, fallback?: CancellableFunction<T>): Promise<T> {
+   this.halfOpenCalls++;
     
     try {
       const result = await this.executeWithTimeout(fn);
