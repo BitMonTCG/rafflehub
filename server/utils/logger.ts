@@ -1,14 +1,14 @@
 // logger.ts - Wrapper to handle ESM compatibility issues with pino
 import type { IncomingMessage, ServerResponse } from 'http';
-import pinoLib from 'pino';
-import pinoHttpLib from 'pino-http';
+import * as pinoModule from 'pino';
+import * as pinoHttpModule from 'pino-http';
 
-// Type-check and ensure correct function signatures
-const pino: typeof pinoLib = pinoLib;
-const pinoHttp: typeof pinoHttpLib = pinoHttpLib;
+// Explicitly access the default export from the module namespace
+const pinoFunction = pinoModule.default;
+const pinoHttpFunction = pinoHttpModule.default;
 
 // Configure the pino logger
-const logger = pino({
+const logger = pinoFunction({
   level: process.env.LOG_LEVEL || 'info',
   ...(process.env.NODE_ENV !== 'production' && {
     transport: {
@@ -23,7 +23,7 @@ const logger = pino({
 });
 
 // Configure the HTTP logger middleware
-const httpLogger = pinoHttp({
+const httpLogger = pinoHttpFunction({
   logger,
   serializers: {
     req(req: any) {
