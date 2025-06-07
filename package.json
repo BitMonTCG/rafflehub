@@ -26,7 +26,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .js,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.ts,.tsx --fix",
-    "lint:imports": "eslint . --ext .js,.ts,.tsx --rule 'import/extensions: [error, ignorePackages, {js: always, ts: never}]' --no-eslintrc",
+    "lint:imports": "eslint . --ext .js,.ts,.tsx",
     "check:imports": "node scripts/check-esm-imports.js"
   },
   "dependencies": {

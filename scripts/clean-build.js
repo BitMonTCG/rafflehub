@@ -78,7 +78,7 @@ async function cleanDirectory(directory) {
         const remainingFiles = await fs.readdir(fullPath);
         if (remainingFiles.length === 0) {
           console.log(`🧹 Removing empty directory: ${path.relative(rootDir, fullPath)}`);
-          await fs.rmdir(fullPath);
+          await fs.rm(fullPath, { recursive: true, force: true });
         }
       } else if (await shouldRemove(fullPath)) {
         await fs.unlink(fullPath);

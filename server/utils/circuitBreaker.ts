@@ -19,12 +19,16 @@ interface CircuitBreakerOptions {
   timeout?: number;            // Optional timeout for function calls in ms
 }
 
+// Function type that supports optional abort signal for cancellation
+type CancellableFunction<T> = (signal?: AbortSignal) => Promise<T>;
+
 export class CircuitBreaker {
   private state: CircuitState = CircuitState.CLOSED;
   private failureCount: number = 0;
   private successCount: number = 0;
   private nextAttempt: number = Date.now();
   private halfOpenCalls: number = 0;
+  private inHalfOpenProbe: boolean = false; // Flag to prevent race conditions
   private readonly options: CircuitBreakerOptions;
   private readonly name: string;
 
@@ -40,11 +44,11 @@ export class CircuitBreaker {
 
   /**
    * Executes a function with circuit breaker protection
-   * @param fn The function to execute
+   * @param fn The function to execute, may accept an AbortSignal for cancellation
    * @param fallback Optional fallback function if circuit is open or call fails
    * @returns The result of fn or fallback
    */
-  async execute<T>(fn: () => Promise<T>, fallback?: () => Promise<T>): Promise<T> {
+  async execute<T>(fn: CancellableFunction<T>, fallback?: CancellableFunction<T>): Promise<T> {
     if (this.isOpen()) {
       if (this.canTry()) {
         return this.tryHalfOpen(fn, fallback);
@@ -65,18 +69,38 @@ export class CircuitBreaker {
     }
   }
 
-  private async executeWithTimeout<T>(fn: () => Promise<T>): Promise<T> {
+  private async executeWithTimeout<T>(fn: (signal?: AbortSignal) => Promise<T>): Promise<T> {
     if (!this.options.timeout) {
       return fn();
     }
 
-    return Promise.race([
-      fn(),
-      new Promise<T>((_, reject) => {
-        setTimeout(() => reject(new Error(`Circuit ${this.name}: Operation timed out after ${this.options.timeout}ms`)), 
-          this.options.timeout);
-      })
-    ]);
+    // Create an AbortController to enable cancellation
+    const abortController = new AbortController();
+    const { signal } = abortController;
+    
+    // Set up the timeout
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, this.options.timeout);
+    
+    try {
+      // Pass the abort signal to the function if it supports it
+      const result = await Promise.race([
+        fn(signal),
+        // This promise rejects when abort() is called or when the timeout occurs
+        new Promise<T>((_, reject) => {
+          // Listen for abort signal
+          signal.addEventListener('abort', () => {
+            reject(new Error(`Circuit ${this.name}: Operation timed out after ${this.options.timeout}ms`));
+          });
+        })
+      ]);
+      
+      return result;
+    } finally {
+      // Clean up regardless of success or failure
+      clearTimeout(timeoutId);
+    }
   }
 
   private isOpen(): boolean {
@@ -84,19 +108,24 @@ export class CircuitBreaker {
   }
 
   private canTry(): boolean {
-    if (this.state === CircuitState.OPEN && Date.now() > this.nextAttempt) {
+    // Use atomic flag to prevent multiple concurrent transitions
+    if (this.state === CircuitState.OPEN && Date.now() > this.nextAttempt && !this.inHalfOpenProbe) {
+      this.inHalfOpenProbe = true; // Set flag to block other requests
       this.state = CircuitState.HALF_OPEN;
       this.halfOpenCalls = 0;
       return true;
     }
 
+    // Only allow additional attempts if we're not exceeding the limit
     return this.state === CircuitState.HALF_OPEN && 
-           this.halfOpenCalls < this.options.maxHalfOpenCalls;
+           this.halfOpenCalls < this.options.maxHalfOpenCalls &&
+           !this.inHalfOpenProbe;
   }
 
-  private async tryHalfOpen<T>(fn: () => Promise<T>, fallback?: () => Promise<T>): Promise<T> {
+  private async tryHalfOpen<T>(fn: CancellableFunction<T>, fallback?: CancellableFunction<T>): Promise<T> {
+    this.successCount = 0; // Reset success count when entering HALF_OPEN state
     this.halfOpenCalls++;
-
+    
     try {
       const result = await this.executeWithTimeout(fn);
       this.onSuccess();
@@ -119,6 +148,10 @@ export class CircuitBreaker {
       this.successCount++;
       if (this.successCount >= this.options.maxHalfOpenCalls) {
         this.reset();
+        this.inHalfOpenProbe = false; // Release the lock when circuit closes
+      } else {
+        // Release the probe lock after success to allow another attempt
+        this.inHalfOpenProbe = false;
       }
     }
   }
@@ -129,6 +162,8 @@ export class CircuitBreaker {
     if ((this.state === CircuitState.CLOSED && this.failureCount >= this.options.failureThreshold) ||
         this.state === CircuitState.HALF_OPEN) {
       this.trip();
+      // Release the half open probe lock on failure
+      this.inHalfOpenProbe = false;
     }
   }
 
@@ -142,6 +177,7 @@ export class CircuitBreaker {
     this.state = CircuitState.CLOSED;
     this.failureCount = 0;
     this.successCount = 0;
+    this.inHalfOpenProbe = false; // Reset the atomic flag
     console.info(`Circuit ${this.name}: CLOSED - service recovered`);
   }
 

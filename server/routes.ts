@@ -343,16 +343,8 @@ const sessionSecret = process.env.SESSION_SECRET;
     csrf(req, res, next);
   });
   
-  // Health check endpoint (must be before CSRF middleware)
-  app.get('/api/health', (req: Request, res: Response) => {
-    console.log('✅ Health check requested');
-    res.json({ 
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      environment: process.env.VERCEL_ENV || 'unknown',
-      sessionStore: usePgSession ? 'postgresql' : 'memory'
-    });
-  });
+  // Health check endpoint is already defined at the top of the route registration
+  // to ensure it's available before the CSRF middleware
 
   // Route to get CSRF token for client-side use
   app.get('/api/csrf-token', (req: Request, res: Response) => {

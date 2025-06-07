@@ -44,8 +44,37 @@ async function getApp() {
 export default async function handler(req, res) {
   const startTime = Date.now();
   
-  // Log request for debugging
-  console.log(`🔍 ${req.method} ${req.url} - Headers: ${JSON.stringify(req.headers, null, 2)}`);
+  // Function to sanitize headers before logging
+  function sanitizeHeaders(headers) {
+    const sensitiveHeaders = [
+      'authorization',
+      'x-api-key',
+      'api-key',
+      'token',
+      'cookie',
+      'session',
+      'x-auth-token',
+      'x-access-token',
+      'apikey',
+      'secret',
+      'password',
+      'credential'
+    ];
+    
+    const sanitized = { ...headers };
+    
+    // Replace sensitive header values with placeholders
+    for (const header of Object.keys(sanitized)) {
+      if (sensitiveHeaders.some(h => header.toLowerCase().includes(h))) {
+        sanitized[header] = '[REDACTED]';
+      }
+    }
+    
+    return sanitized;
+  }
+
+  // Log request for debugging (with sanitized headers)
+  console.log(`🔍 ${req.method} ${req.url} - Headers: ${JSON.stringify(sanitizeHeaders(req.headers), null, 2)}`);
   
   try {
     // Get the Express app instance

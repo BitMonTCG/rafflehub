@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import crypto from 'crypto';
 
 // Schema for validating environment variables
 export const envSchema = z.object({
@@ -7,8 +8,8 @@ export const envSchema = z.object({
   
   // Security
   SESSION_SECRET: z.string().min(16).describe('Secret for session management'),
-  CSRF_SECRET: z.string().min(16).default('default_fallback_secret_CHANGE_ME')
-    .describe('Secret for CSRF token generation'),
+  CSRF_SECRET: z.string().min(32)
+    .describe('Secret for CSRF token generation (required)'),
   
   // BTCPay integration
   BTCPAY_URL: z.string().url().describe('BTCPay Server URL'),
@@ -38,8 +39,28 @@ export type Env = z.infer<typeof envSchema>;
  * @returns The validated environment object
  * @throws If validation fails
  */
+/**
+ * Generates a cryptographically secure random string for use as a CSRF token
+ * @returns A secure random string
+ */
+function generateSecureToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 export function validateEnv(): Env {
   try {
+    // If CSRF_SECRET is not provided, generate a secure one
+    if (!process.env.CSRF_SECRET) {
+      const generatedSecret = generateSecureToken();
+      process.env.CSRF_SECRET = generatedSecret;
+      console.warn('⚠️ No CSRF_SECRET provided in environment. A secure random token has been generated for this session.');
+      
+      if (process.env.NODE_ENV === 'production') {
+        console.warn('⚠️ Warning: Using a generated CSRF_SECRET in production. This will change on server restart!');
+        console.warn('   Consider setting a permanent CSRF_SECRET environment variable.');
+      }
+    }
+    
     return envSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {

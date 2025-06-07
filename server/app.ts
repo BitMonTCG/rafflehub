@@ -4,8 +4,8 @@ dotenv.config();
 
 import express from "express";
 import cookieParser from 'cookie-parser';
-import * as pino from 'pino';
-import * as pinoHttp from 'pino-http';
+import pino from 'pino';
+import pinoHttp from 'pino-http';
 import { registerRoutes } from "./routes.js";
 import { storage } from "./storage.js";
 import type { IStorage } from "./storage.js";
@@ -23,8 +23,8 @@ process.on('unhandledRejection', (reason) => {
 const app = express();
 
 // Initialize pino-http logger
-const pinoLogger = pinoHttp.pinoHttp({
-  logger: pino.pino({
+const pinoLogger = pinoHttp({
+  logger: pino({
     level: process.env.LOG_LEVEL || 'info', // Default to 'info', can be configured via env
   }),
   // Use pino-pretty for local development for human-readable logs
@@ -60,7 +60,7 @@ const pinoLogger = pinoHttp.pinoHttp({
     },
     res(res: any) {
       // Remove potentially sensitive headers from logs
-      const headers = { ...res.headers };
+      const headers = { ...res.getHeaders() };
       delete headers['set-cookie'];
       return {
         statusCode: res.statusCode,
