@@ -3,11 +3,14 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import mung from "express-mung"; // Added import for express-mung
 import cookieParser from 'cookie-parser';
+import * as pino from 'pino';
+import * as pinoHttp from 'pino-http';
 import { registerRoutes } from "./routes.js";
 import { storage } from "./storage.js";
 import type { IStorage } from "./storage.js";
+import { validateEnv } from "./utils/validateEnv.js";
+import { performanceMiddleware } from "./utils/performanceMiddleware.js";
 
 // Prevent unhandled exceptions (especially from HMR WebSocket) from crashing the process
 process.on('uncaughtException', (err) => {
@@ -19,39 +22,95 @@ process.on('unhandledRejection', (reason) => {
 
 const app = express();
 
+// Initialize pino-http logger
+const pinoLogger = pinoHttp.pinoHttp({
+  logger: pino.pino({
+    level: process.env.LOG_LEVEL || 'info', // Default to 'info', can be configured via env
+  }),
+  // Use pino-pretty for local development for human-readable logs
+  ...(process.env.NODE_ENV !== 'production' && {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname', // Vercel adds these, so we can ignore them locally
+      },
+    },
+  }),
+  // Define custom serializers to control what is logged
+  serializers: {
+    req(req: any) {
+      // Remove potentially sensitive headers from logs
+      const headers = { ...req.headers };
+      delete headers.authorization;
+      delete headers.cookie;
+      delete headers['x-csrf-token']; // if you use this header for CSRF
+      delete headers['x-forwarded-for'];
+      delete headers['x-real-ip'];
+
+      return {
+        method: req.method,
+        url: req.url, // Includes query string
+        // query: req.query, // Redundant if url includes query string
+        // params: req.params, // Typically logged by router or controller if needed
+        headers: headers, // Log filtered headers
+        remoteAddress: req.remoteAddress,
+      };
+    },
+    res(res: any) {
+      // Remove potentially sensitive headers from logs
+      const headers = { ...res.headers };
+      delete headers['set-cookie'];
+      return {
+        statusCode: res.statusCode,
+        headers: headers, // Log filtered headers
+      };
+    },
+    err(err: any) {
+      return {
+        type: err.type,
+        message: err.message,
+        stack: err.stack,
+        // any other err properties you want to log
+      };
+    }
+  },
+  // Customize log message format
+  customSuccessMessage: function (req: any, res: any) {
+    if (res.statusCode === 404) {
+      return `${req.method} ${req.url} - ${res.statusCode} not found`;
+    }
+    return `${req.method} ${req.url} - ${res.statusCode} completed in ${(res as any).responseTime}ms`;
+  },
+  customErrorMessage: function (req: any, res: any, err: any) {
+    return `${req.method} ${req.url} - ${res.statusCode} error in ${(res as any).responseTime}ms: ${err.message}`;
+  },
+  // Add a custom attribute to all logs
+  customProps: function (req: any, res: any) {
+    return {
+      // Add any custom properties you want to log with every request
+      // example: reqId: req.id (if you're using request IDs)
+    };
+  }
+});
+
 // Global middleware
+app.use(pinoLogger); // Add pino-http logger as one of the first middleware
+app.use(performanceMiddleware()); // Track API request performance
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Request logging middleware for API routes
-// Request logging middleware for API routes
-// Uses express-mung to safely capture the JSON response body
-app.use(
-  mung.json(function (body, req, res) {
-    // Note: 'finish' event is used here as mung.json executes before the response is fully sent.
-    // For logging purposes, we want to log after the response is completed.
-    const start = Date.now();
-    const path = req.path;
-
-    res.on("finish", () => {
-      const duration = Date.now() - start;
-      if (path.startsWith("/api")) {
-        let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-        if (body) {
-          // body is the captured JSON response
-          logLine += ` :: ${JSON.stringify(body)}`;
-        }
-
-        if (logLine.length > 80) {
-          logLine = logLine.slice(0, 79) + "…";
-        }
-        console.log(logLine);
-      }
-    });
-    return body; // Important: return the body to pass it through
-  })
-);
+// Add health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || 'unknown'
+  });
+});
 
 // Initialize app asynchronously
 let isAppInitialized = false;
@@ -63,6 +122,20 @@ async function initializeApp() {
   }
 
   console.log("🚀 Starting Express app initialization...");
+  
+  // Validate environment variables
+  try {
+    const env = validateEnv();
+    console.log("✅ Environment variables validated successfully");
+  } catch (error) {
+    console.error("❌ Environment validation failed:", error);
+    if (process.env.NODE_ENV === 'production') {
+      console.error("Exiting process due to invalid environment configuration in production.");
+      process.exit(1);
+    } else {
+      console.warn("⚠️ Continuing with invalid environment in development mode - some features may not work.");
+    }
+  }
 
   try {
     // Initialize database with sample data (commented out to prevent seeding)
@@ -81,7 +154,13 @@ async function initializeApp() {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
 
-      console.error(`❌ Global Error Handler: [${status}] ${message}`, err.stack ? { stack: err.stack } : { error: err });
+            // Use _req.log for structured logging if pino-http has attached it
+      if (_req.log) {
+        (_req as any).log.error({ err, status, req_id: (_req as any).id }, `Global Error Handler: ${message}`);
+      } else {
+        // Fallback to console.error if req.log is not available
+        console.error(`❌ Global Error Handler: [${status}] ${message}`, err.stack ? { stack: err.stack } : { error: err });
+      }
 
       res.status(status).json({ message });
     });

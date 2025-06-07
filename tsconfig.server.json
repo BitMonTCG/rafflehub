@@ -24,6 +24,12 @@
     "node_modules",
     "client",
     "dist",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "server/vite.ts",
+    "vite.config.ts",
+    "tailwind.config.ts",
+    "postcss.config.js",
+    "drizzle.config.ts",
+    "vitest.config.ts"
   ]
 } 

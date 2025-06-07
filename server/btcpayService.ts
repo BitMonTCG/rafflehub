@@ -7,10 +7,24 @@ import {
 import crypto from 'crypto';
 import { log } from './vite.js';
 import { btcpayConfig } from '../config/btcpay.js'; // Import configured storeId and webhookSecret
+import { CircuitBreaker } from './utils/circuitBreaker.js';
 
 // Constants
 const TICKET_PRICE_USD = 1.00; // Assuming $1 per ticket
 const CURRENCY = 'USD';
+
+// Create circuit breakers for BTCPay API calls
+const invoiceCreationBreaker = new CircuitBreaker('btcpay-invoice-creation', {
+  failureThreshold: 3,
+  resetTimeout: 30000, // 30 seconds
+  timeout: 10000 // 10 second timeout
+});
+
+const invoiceFetchBreaker = new CircuitBreaker('btcpay-invoice-fetch', {
+  failureThreshold: 5,  // More tolerant for read operations
+  resetTimeout: 15000,   // 15 seconds
+  timeout: 5000          // 5 second timeout
+});
 
 /**
  * Creates a BTCPay Server invoice for a raffle ticket purchase.
@@ -32,6 +46,29 @@ export async function createRaffleTicketInvoice(
   raffleName: string,
   buyerEmail: string | undefined = undefined
 ): Promise<InvoiceData> {
+  // Add feature flag for bypassing BTCPay in emergency situations
+  if (process.env.BTCPAY_BYPASS === 'true' && process.env.NODE_ENV !== 'production') {
+    log('⚠️ BTCPay BYPASS mode active (non-production only) - returning mock invoice');
+    // Create mock invoice with appropriate type conversion
+    const mockInvoice = {
+      id: `mock-${Date.now()}`,
+      checkoutLink: `${process.env.BASE_URL || 'http://localhost:5000'}/mock-checkout/${ticketId}`,
+      status: InvoiceStatus.NEW,
+      amount: rafflePrice.toString(),
+      currency: CURRENCY,
+      createdTime: Math.floor(Date.now() / 1000), // Unix timestamp in seconds
+      expirationTime: Math.floor(Date.now() / 1000) + 900, // 15 minutes from now
+      metadata: {
+        orderId: `raffle-${raffleId}-ticket-${ticketId}`,
+        itemDesc: `${raffleName} Ticket`,
+        buyerId: userId.toString(),
+        ticketId: ticketId.toString(),
+        raffleId: raffleId.toString(),
+      }
+    };
+    
+    return mockInvoice as InvoiceData;
+  }
   const orderId = `raffle-${raffleId}-ticket-${ticketId}`;
   const metadata: { [key: string]: string | number | boolean | object | null } = {
     orderId: orderId,
@@ -55,11 +92,15 @@ export async function createRaffleTicketInvoice(
 
   log(`Creating BTCPay invoice for ticket ${ticketId} (Raffle ${raffleId}) for user ${userId}`);
 
+  // Use circuit breaker for invoice creation
   try {
-    const invoice = await InvoicesService.invoicesCreateInvoice({ 
-      storeId: btcpayConfig.storeId, 
-      requestBody: invoiceRequest 
+    const invoice = await invoiceCreationBreaker.execute(async () => {
+      return await InvoicesService.invoicesCreateInvoice({ 
+        storeId: btcpayConfig.storeId, 
+        requestBody: invoiceRequest 
+      });
     });
+    
     log(`BTCPay invoice created: ${invoice.id} - Checkout: ${invoice.checkoutLink}`);
     return invoice;
   } catch (error) {
@@ -123,9 +164,11 @@ export function verifyWebhookSignature(
  */
 export async function getInvoice(invoiceId: string): Promise<InvoiceData | null> {
   try {
-    const invoice = await InvoicesService.invoicesGetInvoice({ 
-      storeId: btcpayConfig.storeId, 
-      invoiceId: invoiceId 
+    const invoice = await invoiceFetchBreaker.execute(async () => {
+      return await InvoicesService.invoicesGetInvoice({ 
+        storeId: btcpayConfig.storeId, 
+        invoiceId: invoiceId 
+      });
     });
     return invoice;
   } catch (error) {
@@ -185,3 +228,28 @@ export async function getInvoiceStatus(invoiceId: string): Promise<InvoiceStatus
 // - StoresService, ServerInfoService usage
 
 // TODO: Consider adding functions to handle refunds if needed later.
+
+/**
+ * Get the health status of the BTCPay integration
+ * @returns Object containing health information and circuit status
+ */
+/**
+ * Get the health status of the BTCPay integration
+ * @returns Object containing health information and circuit status
+ */
+export function getBTCPayHealth(): any {
+  // Get BTCPay URL from environment variable directly since it's not in the config
+  const btcpayUrl = process.env.BTCPAY_URL || null;
+  
+  return {
+    serviceName: 'BTCPay Server',
+    endpoint: btcpayUrl ? new URL(btcpayUrl).origin : 'Not configured',
+    status: btcpayConfig.storeId ? 'Configured' : 'Not configured',
+    circuits: {
+      invoiceCreation: invoiceCreationBreaker.getState(),
+      invoiceFetch: invoiceFetchBreaker.getState()
+    },
+    storeId: btcpayConfig.storeId ? `${btcpayConfig.storeId.substring(0, 5)}...` : 'Missing',
+    webhook: btcpayConfig.webhookSecret ? 'Configured' : 'Not configured'
+  };
+}

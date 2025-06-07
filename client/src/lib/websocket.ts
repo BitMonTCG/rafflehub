@@ -13,10 +13,8 @@ class WebSocketService {
   }
 
   private checkWebSocketAvailability(): boolean {
-    // Check if we're in development mode
-    const isDevelopment = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1' ||
-                         window.location.hostname.includes('localhost');
+    // Check if we're in development mode using Vite's environment variables
+    const isDevelopment = import.meta.env.DEV;
     
     // Check if WebSocket is available (not on serverless)
     const hasWebSocketSupport = typeof WebSocket !== 'undefined';
@@ -24,6 +22,7 @@ class WebSocketService {
     // Log the decision for debugging
     console.log('WebSocket availability check:', {
       isDevelopment,
+      mode: import.meta.env.MODE,
       hasWebSocketSupport,
       hostname: window.location.hostname,
       enabled: isDevelopment && hasWebSocketSupport

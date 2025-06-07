@@ -1,53 +1,89 @@
-// Simple Vercel serverless function handler
+// Clean Vercel serverless function handler
+// Bypasses complex build system to avoid Rollup/Vite dependency issues
+
 import { initializeApp } from '../build/server-out/server/app.js';
 
-// Initialize the Express app once
-let appInstance = null;
-let appPromise = null;
+// Configuration
+const INITIALIZATION_POLLING_INTERVAL_MS = 10;
 
-const getApp = async () => {
+// Initialize the Express app once and reuse across requests
+let appInstance = null;
+let isInitializing = false;
+
+async function getApp() {
+  // If app is already initialized, return it
   if (appInstance) {
     return appInstance;
   }
   
-  if (!appPromise) {
-    appPromise = initializeApp();
+  // If currently initializing, wait for it
+  if (isInitializing) {
+    while (isInitializing) {
+      await new Promise(resolve => setTimeout(resolve, INITIALIZATION_POLLING_INTERVAL_MS));
+    }
+    return appInstance;
   }
   
-  appInstance = await appPromise;
-  return appInstance;
-};
-
-export default async function handler(req, res) {
-  // Add comprehensive logging for debugging
-  console.log(`🔍 API Request: ${req.method} ${req.url}`);
-  console.log(`🔍 VERCEL_ENV: ${process.env.VERCEL_ENV}`);
-  console.log(`🔍 NODE_ENV: ${process.env.NODE_ENV}`);
+  // Start initialization
+  isInitializing = true;
   
   try {
+    console.log('🚀 Initializing Express app for serverless...');
+    appInstance = await initializeApp();
+    console.log('✅ Express app initialized successfully');
+    return appInstance;
+  } catch (error) {
+    console.error('❌ Failed to initialize Express app:', error);
+    throw error;
+  } finally {
+    isInitializing = false;
+  }
+}
+
+// Main serverless handler
+export default async function handler(req, res) {
+  const startTime = Date.now();
+  
+  // Log request for debugging
+  console.log(`🔍 ${req.method} ${req.url} - Headers: ${JSON.stringify(req.headers, null, 2)}`);
+  
+  try {
+    // Get the Express app instance
     const app = await getApp();
     
     if (!app) {
-      console.error('❌ Express app is null or undefined');
-      return res.status(500).json({ 
-        message: 'Express app initialization failed',
-        error: 'App instance is null'
+      console.error('❌ Express app instance is null');
+      return res.status(500).json({
+        success: false,
+        message: 'Server initialization failed',
+        error: 'Express app instance is null'
       });
     }
     
-    console.log(`✅ Express app initialized, processing ${req.method} ${req.url}`);
-    
-    // Convert Vercel request/response to Express format
+    // Convert Vercel request/response to Express format and handle the request
     app(req, res);
+    
+    // Log completion time
+    const duration = Date.now() - startTime;
+    console.log(`✅ Request ${req.method} ${req.url} completed in ${duration}ms`);
+    
   } catch (error) {
-    console.error('❌ Handler error:', error);
+    const duration = Date.now() - startTime;
+    console.error(`❌ Handler error for ${req.method} ${req.url} after ${duration}ms:`, error);
     console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
-    res.status(500).json({ 
-      message: 'Internal server error',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString(),
-      requestId: req.headers['x-vercel-id'] || 'unknown'
-    });
+    // Ensure we don't send response twice
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-vercel-id'] || 'unknown'
+      });
+    }
   }
-} 
+}
+
+// Named export for compatibility
+export { handler }; 

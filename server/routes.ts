@@ -106,6 +106,32 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   
   console.log('Registering routes for serverless deployment (WebSocket disabled)');
 
+  // --- Health Check Route ---
+  // This route should be accessible without authentication or CSRF for monitoring purposes.
+  app.get('/api/health', (req: Request, res: Response) => {
+    try {
+      // Optional: Add more checks here (e.g., database connectivity)
+      // For now, a simple 200 OK is sufficient.
+      res.status(200).json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        // You can add more info like current git commit, version, etc.
+        // VERCEL_GIT_COMMIT_SHA is available in Vercel build environment
+        commit: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
+      });
+    } catch (error) {
+      // req.log might not be available if pino-http is added after this route
+      // or if this route is hit before pino-http initializes fully.
+      const log = (req as any).log || console;
+      log.error({ err: error }, 'Health check endpoint failed');
+      res.status(503).json({
+        status: "error",
+        message: "Health check failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   // Session middleware
   const usePgSession = false; // As per existing logic, but ensure SESSION_SECRET is strong
   const Store = usePgSession
