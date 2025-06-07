@@ -4,8 +4,11 @@ dotenv.config();
 
 import express from "express";
 import cookieParser from 'cookie-parser';
+// Import pino and pino-http with the correct ESM syntax
 import pino from 'pino';
-import pinoHttp from 'pino-http';
+import pinoHttpDefault from 'pino-http';
+// Use a type assertion to help TypeScript understand these imports
+const pinoHttp: typeof pinoHttpDefault = pinoHttpDefault;
 import { registerRoutes } from "./routes.js";
 import { storage } from "./storage.js";
 import type { IStorage } from "./storage.js";
