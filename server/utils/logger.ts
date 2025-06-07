@@ -1,14 +1,17 @@
 // logger.ts - Wrapper to handle ESM compatibility issues with pino
 import type { IncomingMessage, ServerResponse } from 'http';
-import * as pinoModule from 'pino';
-import * as pinoHttpModule from 'pino-http';
+import { createRequire } from 'node:module';
 
-// Explicitly access the default export from the module namespace
-const pinoFunction = pinoModule.default;
-const pinoHttpFunction = pinoHttpModule.default;
+// Create a require function scoped to the current module
+const require = createRequire(import.meta.url);
+
+// Load pino and pino-http using CJS require semantics
+// This should leverage pino's CJS loader and pino-http's CJS nature.
+const pino = require('pino');
+const pinoHttp = require('pino-http');
 
 // Configure the pino logger
-const logger = pinoFunction({
+const logger = pino({ // pino should now be the callable function
   level: process.env.LOG_LEVEL || 'info',
   ...(process.env.NODE_ENV !== 'production' && {
     transport: {
@@ -23,18 +26,16 @@ const logger = pinoFunction({
 });
 
 // Configure the HTTP logger middleware
-const httpLogger = pinoHttpFunction({
+const httpLogger = pinoHttp({ // pinoHttp should now be the callable function
   logger,
   serializers: {
     req(req: any) {
-      // Remove potentially sensitive headers from logs
       const headers = { ...req.headers };
       delete headers.authorization;
       delete headers.cookie;
       delete headers['x-csrf-token'];
       delete headers['x-forwarded-for'];
       delete headers['x-real-ip'];
-
       return {
         method: req.method,
         url: req.url,
@@ -43,7 +44,6 @@ const httpLogger = pinoHttpFunction({
       };
     },
     res(res: any) {
-      // Remove potentially sensitive headers from logs
       const headers = { ...res.getHeaders() };
       delete headers['set-cookie'];
       return {
