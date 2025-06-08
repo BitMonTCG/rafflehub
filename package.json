@@ -17,7 +17,7 @@
     "start": "node api/index.js",
     "check": "tsc && tsc -p tsconfig.server.json --noEmit",
     "db:generate-pg": "drizzle-kit generate --config ./drizzle.config.ts",
-    "db:migrate-pg": "drizzle-kit up --config ./drizzle.config.ts",
+    "db:migrate-pg": "drizzle-kit migrate --config ./drizzle.config.ts",
     "db:push": "drizzle-kit push --config ./drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
     "test": "vitest run",
