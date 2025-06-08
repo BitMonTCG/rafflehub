@@ -44,8 +44,28 @@ const httpLogger = pinoHttp({ // pinoHttp should now be the callable function
       };
     },
     res(res: any) {
-      const headers = { ...res.getHeaders() };
-      delete headers['set-cookie'];
+      let headers = {};
+      try {
+        // Check if getHeaders method exists before calling it
+        if (typeof res.getHeaders === 'function') {
+          headers = { ...res.getHeaders() };
+          // Only delete if property exists
+          if ('set-cookie' in headers) {
+            delete headers['set-cookie'];
+          }
+        } else if (res.headers) {
+          // Try to use res.headers property if it exists
+          headers = { ...res.headers };
+          // Only delete if property exists
+          if ('set-cookie' in headers) {
+            delete headers['set-cookie'];
+          }
+        }
+        // Otherwise use empty headers object (already initialized)
+      } catch (error) {
+        console.warn('Error serializing response headers:', error);
+      }
+      
       return {
         statusCode: res.statusCode,
         headers: headers,
