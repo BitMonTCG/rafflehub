@@ -47,7 +47,9 @@ console.log(`Session store: ${usePgSession ? 'PostgreSQL (connect-pg-simple)' : 
 const PgSessionStore = connectPgSimple(session);
 const InMemoryStore = MemoryStore(session);
 
-let sessionStoreInstance;
+// Define session store instance with proper typing
+// Using Store interface from express-session
+let sessionStoreInstance: session.Store;
 
 if (usePgSession) {
   try {
@@ -169,25 +171,14 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
     }
   });
 
-  // Session middleware
-  const usePgSession = false; // As per existing logic, but ensure SESSION_SECRET is strong
-  const Store = usePgSession
-    ? connectPgSimple(session)
-    : MemoryStore(session);
-
-  const sessionStoreInstance = usePgSession
-    ? new (Store as any)({
-        connectionString: process.env.DATABASE_URL,
-        tableName: 'user_sessions',
-        createTableIfMissing: true,
-        ssl: true,
-        pool: { max: 10, idleTimeoutMillis: 30000 }
-      })
-    : new (Store as any)({ checkPeriod: 86400000 });
+  // Use the pre-configured session store from the top of the file
+  // This ensures we follow the proper environment-based session store configuration
+  console.log('Using pre-configured session store: ' + 
+    (usePgSession ? 'PostgreSQL (persistent)' : 'Memory (non-persistent, development only)'));
 
   app.use(
     session({
-      store: sessionStoreInstance,
+      store: sessionStoreInstance, // Using the store already configured above
       secret: process.env.SESSION_SECRET || "default_fallback_secret_CHANGE_ME", // IMPORTANT: Use a strong secret from env
       resave: false,
       saveUninitialized: false,
@@ -362,7 +353,7 @@ const sessionSecret = process.env.SESSION_SECRET;
   console.log('DATABASE_URL available:', !!process.env.DATABASE_URL);
   
   app.use(session({
-    store: sessionStore,
+    store: sessionStoreInstance,
     secret: sessionSecret,
     resave: false, // Changed from true to false for better session handling
     saveUninitialized: false,

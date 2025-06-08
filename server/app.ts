@@ -22,8 +22,7 @@ process.on('unhandledRejection', (reason) => {
 
 const app = express();
 
-// Trust proxy for Vercel environment (fixes X-Forwarded-For header issues)
-app.set('trust proxy', true);
+// Trust proxy is configured conditionally in the initializeApp function
 
 // Use the pre-configured logger from utils/logger.js
 

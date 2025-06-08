@@ -99,7 +99,6 @@ try {
 }
 
 // Create the postgres client with our extracted parameters
-// CRITICAL: Use the parsed options instead of the problematic connection string
 // For serverless environments like Vercel, we need to be careful with connection management
 console.log(`Configuring Postgres connection to ${pgOptions.host}:${pgOptions.port || 5432} for database ${pgOptions.database}`);
 
@@ -108,8 +107,45 @@ console.log(`Configuring Postgres connection to ${pgOptions.host}:${pgOptions.po
 let db: PostgresJsDatabase<PgSchema>;
 
 try {
-  // Create the postgres client with safe connection options
-  const client = postgres(process.env.DATABASE_URL, { 
+  // Properly encode connection string components to handle special characters
+  // Instead of using DATABASE_URL directly, we'll construct it with proper encoding
+  let connectionString;
+  
+  if (process.env.DATABASE_URL) {
+    // Parse the connection string components safely
+    const dbUrlMatch = process.env.DATABASE_URL.match(/postgres:\/\/([^:]+):([^@]+)@([^/]+)\/(.+)/);
+    
+    if (dbUrlMatch) {
+      const [, user, password, hostPort, database] = dbUrlMatch;
+      // Encode each component separately to handle special chars in password
+      const encodedUser = encodeURIComponent(user);
+      const encodedPassword = encodeURIComponent(password);
+      const dbName = database.split('?')[0]; // Remove query params if any
+      const queryParams = database.includes('?') ? '?' + database.split('?')[1] : '';
+      
+      connectionString = `postgres://${encodedUser}:${encodedPassword}@${hostPort}/${dbName}${queryParams}`;
+      console.log(`Using properly encoded database connection string`);
+    } else {
+      console.warn('Could not parse DATABASE_URL, using original (may cause errors if it contains special characters)');
+      connectionString = process.env.DATABASE_URL;
+    }
+  } else if (pgOptions.user && pgOptions.password && pgOptions.host && pgOptions.database) {
+    // Construct from parsed components
+    const port = pgOptions.port || 5432;
+    connectionString = `postgres://${encodeURIComponent(pgOptions.user)}:${encodeURIComponent(pgOptions.password)}@${pgOptions.host}:${port}/${pgOptions.database}`;
+    console.log('Using constructed connection string from parsed components');
+  } else {
+    throw new Error('No valid database connection information available');
+  }
+  
+  // Create the postgres client using parsed parameters instead of raw connection string
+  // This avoids issues with special characters in passwords
+  const client = postgres({
+    host: pgOptions.host,
+    port: pgOptions.port || 5432,
+    database: pgOptions.database,
+    username: pgOptions.user,
+    password: pgOptions.password,
     ssl: 'require',  // Always enforce SSL for security
     max: 5,          // Reduce connection pool size for serverless
     idle_timeout: 10, // Close idle connections faster
@@ -117,6 +153,20 @@ try {
     connect_timeout: 30, // Timeout after 30s if cannot connect
     prepare: false,   // Don't prepare statements (reduces overhead)
   });
+  
+  console.log(`Using database connection with parsed options (host: ${pgOptions.host}, db: ${pgOptions.database})`);
+  
+  // Verify connection works by testing a simple query
+  // Use immediate invocation to handle the async operation
+  await (async () => {
+    try {
+      const testResult = await client`SELECT 1 as connection_test`;
+      console.log('✅ Database connection verified successfully');  
+    } catch (testError: any) { // Type as any to access .message property safely
+      console.error('❌ Database connection test failed:', testError);
+      throw new Error(`Database connection test failed: ${testError?.message || String(testError)}`);
+    }
+  })();
   
   // Initialize the Drizzle ORM with our client and schema
   db = drizzle(client, { schema });
