@@ -4,7 +4,8 @@ import './env.js';
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '../shared/schema.js'; // Import from unified PostgreSQL schema with .js extension
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -47,23 +48,30 @@ export async function initializeDbClient(): Promise<PostgresJsDatabase<PgSchema>
     // Path to SSL certificate
     const certPath = path.resolve(process.cwd(), 'prod-ca-2021.crt');
     
-    // Check for SSL certificate without using synchronous methods
+    // Use asynchronous methods for file operations to avoid blocking the event loop
     // Define proper type for the SSL config to match postgres.js requirements
     // postgres.js accepts boolean | object with SSL options
-    let sslConfig: boolean | { ca?: string; rejectUnauthorized?: boolean } = { rejectUnauthorized: false }; // Default setting that works with Supabase
+    // Set rejectUnauthorized based on environment for security
+    let sslConfig: boolean | { ca?: string; rejectUnauthorized?: boolean } = { 
+      rejectUnauthorized: isProduction // Enforce TLS verification in production, allow self-signed in dev
+    };
     
     try {
-      const certExists = fs.existsSync(certPath);
-      if (certExists) {
-        const certContent = fs.readFileSync(certPath, 'utf8');
-        sslConfig = {
-          ca: certContent,
-          rejectUnauthorized: isProduction // Only enforce in production
-        };
-        console.log('SSL certificate found and loaded');
-      } else {
-        console.log(`SSL certificate not found at ${certPath}`);
-      }
+      // Use async file access check instead of existsSync
+      await fs.access(certPath, fsConstants.R_OK)
+        .then(async () => {
+          // File exists and is readable, load it asynchronously
+          const certContent = await fs.readFile(certPath, 'utf8');
+          sslConfig = {
+            ca: certContent,
+            rejectUnauthorized: isProduction // Only enforce in production
+          };
+          console.log('SSL certificate found and loaded');
+        })
+        .catch(() => {
+          // File doesn't exist or isn't readable
+          console.log(`SSL certificate not found at ${certPath}`);
+        });
     } catch (err: unknown) {
       // Handle error with proper type checking
       const error = err as Error;
@@ -122,6 +130,7 @@ export async function initializeDbClient(): Promise<PostgresJsDatabase<PgSchema>
     console.warn('⚠️ Running in development mode with potentially broken DB connection');
     const fallbackClient = postgres(process.env.DATABASE_URL || '', { ssl: 'require' });
     db = drizzle(fallbackClient, { schema });
+    isInitialized = true; // Set the flag to prevent retry loops on subsequent calls
     return db;
   }
 }

@@ -112,78 +112,83 @@ async function generateSchemaSQL(): Promise<void> {
       throw new Error('No migration files found after generation');
     } catch (migrationError) {
       console.error('⚠️ Drizzle migration generation failed:', migrationError.message);
-      console.log('🔄 Falling back to manual schema extraction...');
+      console.log('🔄 Attempting to generate schema directly from schema.ts file...');
       
-      // Manual fallback - create a basic schema SQL
-      const fallbackSQL = `
--- Basic tables needed for RaffleHub app
--- NOTE: This is a fallback basic schema, may not include all columns
-
--- Users table
-CREATE TABLE IF NOT EXISTS "users" (
-  "id" SERIAL PRIMARY KEY,
-  "username" VARCHAR(50) UNIQUE NOT NULL,
-  "email" VARCHAR(100) UNIQUE NOT NULL,
-  "passwordHash" VARCHAR(100) NOT NULL,
-  "walletAddress" VARCHAR(255),
-  "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Raffles table
-CREATE TABLE IF NOT EXISTS "raffles" (
-  "id" SERIAL PRIMARY KEY,
-  "title" VARCHAR(100) NOT NULL,
-  "description" TEXT,
-  "imageUrl" VARCHAR(255),
-  "startDate" TIMESTAMP WITH TIME ZONE,
-  "endDate" TIMESTAMP WITH TIME ZONE,
-  "status" VARCHAR(20) DEFAULT 'active',
-  "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  "userId" INTEGER REFERENCES "users"("id")
-);
-
--- Tickets table
-CREATE TABLE IF NOT EXISTS "tickets" (
-  "id" SERIAL PRIMARY KEY,
-  "raffleId" INTEGER REFERENCES "raffles"("id"),
-  "userId" INTEGER REFERENCES "users"("id"),
-  "ticketNumber" VARCHAR(100) NOT NULL,
-  "purchased" BOOLEAN DEFAULT FALSE,
-  "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Winners table
-CREATE TABLE IF NOT EXISTS "winners" (
-  "id" SERIAL PRIMARY KEY,
-  "raffleId" INTEGER REFERENCES "raffles"("id"),
-  "userId" INTEGER REFERENCES "users"("id"),
-  "ticketId" INTEGER REFERENCES "tickets"("id"),
-  "prizeDescription" TEXT,
-  "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-${createSessionsTableSQL()}
-${createUserSessionsTableSQL()}
-      `;
+      try {
+        // Import the schema file directly and extract table definitions
+        // We need to check if the schema module is available
+        const schemaModule = await import('../shared/schema.js');
+        if (!schemaModule) {
+          throw new Error('Unable to import schema.ts module');
+        }
+        
+        // Extract tables from the schema
+        const tables = [
+          { name: 'users', schema: schemaModule.users },
+          { name: 'raffles', schema: schemaModule.raffles },
+          { name: 'tickets', schema: schemaModule.tickets },
+          { name: 'winners', schema: schemaModule.winners },
+        ];
+        
+        if (tables.some(t => !t.schema)) {
+          throw new Error('One or more required tables not found in schema');
+        }
+        
+        console.log('✅ Successfully parsed schema.ts file');
+        console.log('📝 Generating SQL schema from parsed schema definitions...');
+        
+        // Generate a complete SQL schema based on the schema.ts file
+        // This would ideally use Drizzle's own schema-to-SQL functionality
+        // For now, we'll fail fast and refer to the alternative approach
+        
+        // If we're here, we couldn't generate the SQL automatically
+        console.error('⚠️ Automatic SQL generation from schema.ts is not fully implemented');
+        console.log('👉 Using complete_schema.sql as a stable reference instead');
+        
+        // Check if complete_schema.sql exists
+        const completeSchemaPath = path.join(outputDir, 'complete_schema.sql');
+        if (!fs.existsSync(completeSchemaPath)) {
+          throw new Error('complete_schema.sql not found. Please run `drizzle-kit generate:pg` manually and update this file.');
+        }
+        
+        // Use the complete schema file
+        let sql = fs.readFileSync(completeSchemaPath, 'utf-8');
+        
+        // Add session tables
+        sql += '\n\n-- Adding session management tables\n';
+        sql += createSessionsTableSQL();
+        sql += createUserSessionsTableSQL();
+        
+        // Write enhanced schema to file
+        const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
+        const filePath = path.join(outputDir, `${timestamp}_enhanced_schema.sql`);
+        fs.writeFileSync(filePath, sql);
+        
+        console.log(`\n✅ Generated an enhanced schema from complete_schema.sql: ${filePath}`);
+        console.log('\n--- SQL FILE CONTENTS ---\n');
+        console.log(sql);
+        console.log('\n-------------------------\n');
+      } catch (innerError) {
+        console.error('❌ Failed to generate schema from schema.ts or complete_schema.sql:', innerError.message);
+        throw new Error('Could not generate schema SQL: ' + innerError.message);
+      }
       
-      // Write fallback SQL to file
-      const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-      const filePath = path.join(outputDir, `${timestamp}_fallback_schema.sql`);
-      fs.writeFileSync(filePath, fallbackSQL);
+      // Get the most recent file path (from either the try or catch block)
+      const recentFiles = fs.readdirSync(outputDir)
+        .filter(f => f.endsWith('.sql'))
+        .map(f => path.join(outputDir, f))
+        .sort((a, b) => fs.statSync(b).mtime.getTime() - fs.statSync(a).mtime.getTime());
       
-      console.log(`\n⚠️ Generated a fallback basic schema: ${filePath}`);
-      console.log('\n--- SQL FILE CONTENTS ---\n');
-      console.log(fallbackSQL);
-      console.log('\n-------------------------\n');
+      const latestFilePath = recentFiles[0] || 'No SQL file generated';
       
       console.log(`📋 Instructions for Supabase Migration:\n`);
       console.log(`1. Go to your Supabase project dashboard`);
       console.log(`2. Navigate to "SQL Editor" in the sidebar`);
       console.log(`3. Create a new query`);
-      console.log(`4. Copy and paste the SQL from: ${filePath}`);
-      console.log(`5. Review the SQL before executing - this is a fallback schema`);
+      console.log(`4. Copy and paste the SQL from: ${latestFilePath}`);
+      console.log(`5. Review the SQL carefully before executing`);
       console.log(`6. Execute the query`);
-      console.log(`\n⚠️ Note: This is a basic schema that may need adjustments`);
+      console.log(`\nℹ️ Note: Always review the schema for completeness before executing`);
     }
   } catch (error) {
     console.error('❌ Schema generation failed:', error);

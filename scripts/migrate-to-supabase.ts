@@ -95,9 +95,9 @@ async function migrateToSupabase() {
     // Read the migration SQL
     let migrationSQL = fs.readFileSync(latestMigrationFile, 'utf-8');
     
-    // Add sessions table SQL
-    const sessionsTableSQL = await createSessionsTableSQL();
-    migrationSQL += sessionsTableSQL;
+// Add sessions table SQL
+    const sessionsTableSQL = createSessionsTableSQL();
+     migrationSQL += sessionsTableSQL;
     
     // Output full migration path
     const outputDir = path.join(process.cwd(), 'migrations');

@@ -63,19 +63,18 @@ if (usePgSession) {
     sessionStoreInstance = new PgSessionStore({
       conObject: {
         connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false }
+        ssl: { rejectUnauthorized: false },
+        // Add serverless-friendly connection options directly in the conObject
+        // The library will manage its own internal pool with these settings
+        max: 5, // Reduce max connections for serverless
+        idleTimeoutMillis: 10000, // Close idle connections more quickly (10s)
+        connectionTimeoutMillis: 30000, // Allow 30s to establish connection
+        statement_timeout: 60000, // Limit query time to 60s
       },
       tableName: 'sessions', // Table name for session storage
       createTableIfMissing: true, // Create table if it doesn't exist
       // Optimize for serverless: clean expired sessions more frequently
       pruneSessionInterval: 60, // prune expired sessions every minute
-      // Connection pooling is handled by Supabase connection pooler
-      // Use pg Pool options that match connect-pg-simple expectations
-      pool: new Pool({
-        max: 10, // Maximum number of clients in the pool
-        idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-        connectionTimeoutMillis: 10000 // Return an error after 10 seconds if connection not established
-      })
     });
     
     console.log('🔐 Using PostgreSQL session store for persistence');
