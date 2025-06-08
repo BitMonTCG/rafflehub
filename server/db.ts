@@ -100,23 +100,54 @@ try {
 
 // Create the postgres client with our extracted parameters
 // CRITICAL: Use the parsed options instead of the problematic connection string
-const client = postgres({
-  host: pgOptions.host,
-  port: pgOptions.port || 5432,
-  database: pgOptions.database,
-  username: pgOptions.username,
-  password: pgOptions.password,
+// For serverless environments like Vercel, we need to be careful with connection management
+console.log(`Configuring Postgres connection to ${pgOptions.host}:${pgOptions.port || 5432} for database ${pgOptions.database}`);
 
-  ssl: 'require', // Always enforce SSL for security (works with Supabase)
-  max: 10, // Connection pool size
-  idle_timeout: 20, // Optional: seconds before closing idle connections
-  max_lifetime: 60 * 30, // Optional: seconds before closing connections (even if active)
-});
+// Set up connection options with only the supported properties for postgres-js
+// Define db variable outside try/catch for proper scoping
+let db: PostgresJsDatabase<PgSchema>;
 
-export const db: PostgresJsDatabase<PgSchema> = drizzle(client, { schema });
+try {
+  // Create the postgres client with safe connection options
+  const client = postgres(process.env.DATABASE_URL, { 
+    ssl: 'require',  // Always enforce SSL for security
+    max: 5,          // Reduce connection pool size for serverless
+    idle_timeout: 10, // Close idle connections faster
+    max_lifetime: 60, // Close connections after a minute to prevent hanging connections
+    connect_timeout: 30, // Timeout after 30s if cannot connect
+    prepare: false,   // Don't prepare statements (reduces overhead)
+  });
+  
+  // Initialize the Drizzle ORM with our client and schema
+  db = drizzle(client, { schema });
+  
+  // Add connection validation test (don't block initialization)
+  client.unsafe("SELECT 1 as connection_test").then(() => {
+    console.log(`✅ PostgreSQL connection validated successfully to ${pgOptions.host}`);
+  }).catch(err => {
+    console.error(`❌ PostgreSQL connection validation failed:`, err);
+  });
+  
+  console.log(`PostgreSQL client initialized successfully for ${pgOptions.host}`);
+} catch (error) {
+  console.error(`❌ Critical error creating PostgreSQL client:`, error);
+  
+  // Re-throw to prevent app from running with broken DB connection in production
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`Failed to initialize PostgreSQL client: ${error instanceof Error ? error.message : String(error)}`);
+  } else {
+    console.warn(`⚠️ Running in development mode with potentially broken DB connection`);
+    // Create a minimum viable client for development debugging
+    const fallbackClient = postgres(process.env.DATABASE_URL, { ssl: 'require' });
+    db = drizzle(fallbackClient, { schema });
+  }
+}
+
+// Export the db instance
+export { db };
 
 // Export all named exports from the schema module for easy access elsewhere
 // This makes it easy to use your tables, relations, etc.
-export * from '../shared/schema.js'; // Export from unified PostgreSQL schema
+export * from '../shared/schema.js';
 
 console.log(`Connected to PostgreSQL on ${pgOptions.host} as ${pgOptions.username}`);

@@ -44,31 +44,48 @@ const httpLogger = pinoHttp({ // pinoHttp should now be the callable function
       };
     },
     res(res: any) {
+      // Initialize with empty headers object
       let headers = {};
+      let statusCode = 0;
+      
       try {
-        // Check if getHeaders method exists before calling it
+        // Safely extract status code
+        statusCode = typeof res.statusCode === 'number' ? res.statusCode : 0;
+        
+        // Handle multiple possible header sources in different environments
         if (typeof res.getHeaders === 'function') {
-          headers = { ...res.getHeaders() };
-          // Only delete if property exists
-          if ('set-cookie' in headers) {
-            delete headers['set-cookie'];
+          // Express response with getHeaders() method
+          try {
+            headers = { ...res.getHeaders() };
+          } catch (headerError) {
+            // Silent fail - sometimes getHeaders() throws
+            // This happens especially in serverless environments
           }
-        } else if (res.headers) {
-          // Try to use res.headers property if it exists
+        } else if (res.headers && typeof res.headers === 'object') {
+          // Node.js standard response headers object
           headers = { ...res.headers };
-          // Only delete if property exists
-          if ('set-cookie' in headers) {
-            delete headers['set-cookie'];
+        } else if (res._headers && typeof res._headers === 'object') {
+          // Some versions expose headers via _headers
+          headers = { ...res._headers };
+        }
+        
+        // Sanitize headers - remove sensitive information
+        // Use type-safe operations that won't throw
+        const sensitiveHeaders = ['set-cookie', 'cookie', 'authorization'];
+        for (const header of sensitiveHeaders) {
+          if (headers && typeof headers === 'object' && header in headers) {
+            // Use type assertion to satisfy TypeScript
+            delete (headers as Record<string, unknown>)[header];
           }
         }
-        // Otherwise use empty headers object (already initialized)
       } catch (error) {
-        console.warn('Error serializing response headers:', error);
+        // If anything goes wrong, log it but don't crash
+        console.warn('Error in response serializer:', error instanceof Error ? error.message : String(error));
       }
       
       return {
-        statusCode: res.statusCode,
-        headers: headers,
+        statusCode,
+        headers,
       };
     },
     err(err: any) {

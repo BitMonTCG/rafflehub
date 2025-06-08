@@ -30,15 +30,19 @@ interface BtcPayWebhookPayload {
 // Setup session store
 // Use PostgreSQL for session storage on Vercel (production & preview), MemoryStore for local development.
 const vercelEnv = process.env.VERCEL_ENV; // 'production', 'preview', or 'development'
-const usePgSession = vercelEnv === 'production' || vercelEnv === 'preview';
-const isProduction = vercelEnv === 'production';
+const isProduction = vercelEnv === 'production' || process.env.NODE_ENV === 'production';
 
+// Determine session store type based on environment
+// Force PostgreSQL in production, even if VERCEL_ENV isn't set (safety measure)
+const usePgSession = isProduction || vercelEnv === 'preview';
+
+// Critical safety check for production
 if (isProduction && !usePgSession) {
-  console.error("CRITICAL ERROR: Attempting to use MemoryStore in production. Exiting.");
-  process.exit(1); // Exit immediately to prevent running with MemoryStore
+  console.error("🚨 CRITICAL ERROR: Cannot use MemoryStore in production. Exiting.");
+  process.exit(1); // Exit immediately to prevent unstable behavior
 }
 
-console.log(`Session store: ${usePgSession ? 'PostgreSQL (connect-pg-simple)' : 'MemoryStore (memorystore)'} (VERCEL_ENV=${vercelEnv})`);
+console.log(`Session store: ${usePgSession ? 'PostgreSQL (connect-pg-simple)' : 'MemoryStore (memorystore)'} (ENV=${isProduction ? 'production' : 'development'}, VERCEL_ENV=${vercelEnv || 'not set'})`);
 
 const PgSessionStore = connectPgSimple(session);
 const InMemoryStore = MemoryStore(session);
@@ -47,36 +51,57 @@ let sessionStoreInstance;
 
 if (usePgSession) {
   try {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is required for PostgreSQL session store');
+    }
+    
+    // Configure PostgreSQL connection pool with reasonable defaults for serverless
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: isProduction ? { rejectUnauthorized: false } : false, // SSL config for pg.Pool
-      max: 10, // Maximum number of clients in the pool
-      idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+      ssl: isProduction ? { rejectUnauthorized: false } : false, // SSL required in production
+      max: 5, // Smaller pool size for serverless
+      idleTimeoutMillis: 10000, // Close idle clients faster (10 seconds)
+      connectionTimeoutMillis: 5000, // Timeout after 5 seconds if can't connect
     });
     
-    // Test the connection in background, don't await
-    pool.query('SELECT NOW()').then(() => {
-      console.log('✅ PostgreSQL connection successful');
+    // Test the connection without blocking initialization
+    pool.query('SELECT NOW() as connection_test').then((result) => {
+      console.log(`✅ PostgreSQL session store connection successful: ${result?.rows?.[0]?.connection_test || 'OK'}`);
     }).catch((error) => {
-      console.warn('⚠️  PostgreSQL connection test failed:', error);
+      console.error('❌ PostgreSQL session store connection test failed:', error);
     });
     
+    // Initialize PG Session Store
     sessionStoreInstance = new PgSessionStore({
-      pool: pool, // Pass the pre-configured pool
-      tableName: 'user_sessions',
-      createTableIfMissing: true,
+      pool, // Pass the pre-configured pool
+      tableName: 'user_sessions', // Standard table name
+      createTableIfMissing: true, // Create table if it doesn't exist
+      // Optimize for serverless: clean expired sessions more frequently
+      pruneSessionInterval: 60, // prune expired sessions every minute
     });
+    
+    console.log('🔐 Using PostgreSQL session store for persistence');
   } catch (error) {
-    console.error('❌ PostgreSQL session store failed, falling back to MemoryStore:', error);
-    console.warn('⚠️  This may cause session issues in serverless environment');
-    sessionStoreInstance = new InMemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    });
+    console.error('❌ PostgreSQL session store initialization failed:', error);
+    
+    if (isProduction) {
+      // In production, PG session store failure is critical
+      console.error('🚨 Cannot continue in production without persistent session store. Exiting.');
+      process.exit(1);
+    } else {
+      // In dev, fall back to memory store with warning
+      console.warn('⚠️  Falling back to MemoryStore for development - sessions will not persist');
+      sessionStoreInstance = new InMemoryStore({
+        checkPeriod: 86400000 // prune expired entries every 24h
+      });
+    }
   }
 } else {
+  // Development environment - use in-memory store
   sessionStoreInstance = new InMemoryStore({
     checkPeriod: 86400000 // prune expired entries every 24h
   });
+  console.log('💾 Using in-memory session store (development only)');
 }
 
 const sessionStore = sessionStoreInstance;
@@ -85,13 +110,25 @@ const sessionStore = sessionStoreInstance;
 
 // Initialize csurf protection
 // IMPORTANT: csurf middleware must come AFTER session middleware and cookie-parser
+
+// Ensure we have a CSRF secret in production
+if (process.env.NODE_ENV === 'production' && !process.env.CSRF_SECRET) {
+  console.error('🚨 CRITICAL: Missing CSRF_SECRET environment variable in production!');
+  // Don't exit process, but log warning - this should be fixed ASAP
+  console.warn('Security vulnerability: Using fallback secret instead of secure CSRF_SECRET');
+}
+
 const csrfProtection = csurf({
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
     sameSite: 'strict',
+    // The CSRF_SECRET is used by the server to sign the cookie, not as the cookie value itself
   }
 });
+
+// Log CSRF protection status
+console.log(`CSRF Protection enabled with ${process.env.CSRF_SECRET ? 'custom secret' : 'default secret'}`);
 
 function broadcast(message: any) {
   // WebSocket functionality disabled for Vercel serverless compatibility

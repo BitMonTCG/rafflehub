@@ -22,6 +22,9 @@ process.on('unhandledRejection', (reason) => {
 
 const app = express();
 
+// Trust proxy for Vercel environment (fixes X-Forwarded-For header issues)
+app.set('trust proxy', true);
+
 // Use the pre-configured logger from utils/logger.js
 
 // Global middleware
@@ -52,13 +55,34 @@ async function initializeApp() {
 
   console.log("🚀 Starting Express app initialization...");
   
+  // Log running environment
+  const isVercel = !!process.env.VERCEL;
+  const vercelEnv = process.env.VERCEL_ENV || 'development';
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  
+  console.log(`Environment: Node.js ${process.version}, NODE_ENV=${nodeEnv}${isVercel ? `, Vercel ${vercelEnv}` : ''}`); 
+  
+  // Configure Express for Vercel environment
+  // Trust proxy in production and on Vercel (required for proper IP detection behind proxies/load balancers)
+  const shouldTrustProxy = nodeEnv === 'production' || isVercel;
+  
+  if (shouldTrustProxy) {
+    console.log('✅ Enabling trust proxy for production/Vercel environment');
+    app.set('trust proxy', true); 
+  }
+  
   // Validate environment variables
   try {
     const env = validateEnv();
     console.log("✅ Environment variables validated successfully");
+    
+    // Additional check for secure cookie policy
+    const usingSecureCookies = nodeEnv === 'production' || vercelEnv === 'production';
+    console.log(`Cookie security: ${usingSecureCookies ? 'Using secure cookies (HTTPS)' : 'Using insecure cookies (HTTP)'}`); 
+    
   } catch (error) {
     console.error("❌ Environment validation failed:", error);
-    if (process.env.NODE_ENV === 'production') {
+    if (nodeEnv === 'production') {
       console.error("Exiting process due to invalid environment configuration in production.");
       process.exit(1);
     } else {
