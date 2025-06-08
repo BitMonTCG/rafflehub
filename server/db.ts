@@ -78,14 +78,23 @@ export async function initializeDbClient(): Promise<PostgresJsDatabase<PgSchema>
       console.log(`Error loading SSL certificate: ${error.message}`);
     }
     
-    sql = postgres(process.env.DATABASE_URL, {
-      ssl: sslConfig,       // Use SSL with certificate if available
-      max: isPooled ? 10 : 5, // Larger pool for pooled connections
-      idle_timeout: 10,     // Close idle connections faster
-      max_lifetime: 60,     // Close connections after a minute
-      connect_timeout: 30,  // Timeout after 30s if cannot connect
-      prepare: false,       // Don't prepare statements (reduces overhead)
-    });
+    try {
+      sql = postgres(process.env.DATABASE_URL, {
+        ssl: sslConfig,       // Use SSL with certificate if available
+        max: isPooled ? 10 : 5, // Larger pool for pooled connections
+        idle_timeout: 10,     // Close idle connections faster
+        max_lifetime: 60,     // Close connections after a minute
+        connect_timeout: 30,  // Timeout after 30s if cannot connect
+        prepare: false,       // Don't prepare statements (reduces overhead)
+      });
+    } catch (error: unknown) {
+      if (error instanceof URIError) {
+        console.error('❌ CRITICAL: Database connection string is malformed. Please check for special characters in the password or username that need to be URL-encoded.');
+        throw new Error(`Critical database connection failure: ${error.message}`);
+      }
+      // Re-throw other errors
+      throw error;
+    }
     
     // Test the connection with timeout and retries
     let connected = false;
