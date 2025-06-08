@@ -11,6 +11,7 @@ import { storage } from "./storage.js";
 import type { IStorage } from "./storage.js";
 import { validateEnv } from "./utils/validateEnv.js";
 import { performanceMiddleware } from "./utils/performanceMiddleware.js";
+import { initializeDbClient } from "./db.js";
 
 // Prevent unhandled exceptions (especially from HMR WebSocket) from crashing the process
 process.on('uncaughtException', (err) => {
@@ -90,8 +91,10 @@ async function initializeApp() {
   }
 
   try {
-    // Initialize database with sample data (commented out to prevent seeding)
-    console.log("📊 Database initialization skipped.");
+    // Initialize database connection to Supabase
+    console.log("🗃️ Initializing Supabase database connection...");
+    await initializeDbClient();
+    console.log("✅ Database connection initialized successfully");
     
     // BTCPay configuration is loaded via btcpayConfig module
     console.log("💰 BTCPay Service configuration loaded.")

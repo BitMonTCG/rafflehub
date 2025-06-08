@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { storage, IStorage } from "./storage.js";
-import { users, insertUserSchema, raffles, insertRaffleSchema, tickets, insertTicketSchema, winners, insertWinnerSchema, User, Winner, Raffle, Ticket, InsertUser } from "./db.js";
+import { users, insertUserSchema, raffles, insertRaffleSchema, tickets, insertTicketSchema, winners, insertWinnerSchema, User, Winner, Raffle, Ticket, InsertUser, sql } from "./db.js";
 import { z, ZodError } from "zod";
 import express, { NextFunction } from "express";
 import passport from "passport";
@@ -9,7 +9,7 @@ import session from "express-session";
 import connectPgSimple from 'connect-pg-simple';
 import MemoryStore from 'memorystore';
 import bcrypt from 'bcrypt'; // Add bcrypt import
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { fromZodError } from 'zod-validation-error';
 import * as btcpayService from './btcpayService.js';
 import { InvoiceStatus } from 'btcpay-greenfield-node-client';
@@ -57,29 +57,25 @@ if (usePgSession) {
       throw new Error('DATABASE_URL environment variable is required for PostgreSQL session store');
     }
     
-    // Configure PostgreSQL connection pool with reasonable defaults for serverless
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: isProduction ? { rejectUnauthorized: false } : false, // SSL required in production
-      max: 5, // Smaller pool size for serverless
-      idleTimeoutMillis: 10000, // Close idle clients faster (10 seconds)
-      connectionTimeoutMillis: 5000, // Timeout after 5 seconds if can't connect
-    });
+    console.log('🔄 Initializing PostgreSQL session store with Supabase');
     
-    // Test the connection without blocking initialization
-    pool.query('SELECT NOW() as connection_test').then((result) => {
-      console.log(`✅ PostgreSQL session store connection successful: ${result?.rows?.[0]?.connection_test || 'OK'}`);
-    }).catch((error) => {
-      console.error('❌ PostgreSQL session store connection test failed:', error);
-    });
-    
-    // Initialize PG Session Store
+    // Initialize PG Session Store with Supabase connection
     sessionStoreInstance = new PgSessionStore({
-      pool, // Pass the pre-configured pool
-      tableName: 'user_sessions', // Standard table name
+      conObject: {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+      },
+      tableName: 'sessions', // Table name for session storage
       createTableIfMissing: true, // Create table if it doesn't exist
       // Optimize for serverless: clean expired sessions more frequently
       pruneSessionInterval: 60, // prune expired sessions every minute
+      // Connection pooling is handled by Supabase connection pooler
+      // Use pg Pool options that match connect-pg-simple expectations
+      pool: new Pool({
+        max: 10, // Maximum number of clients in the pool
+        idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+        connectionTimeoutMillis: 10000 // Return an error after 10 seconds if connection not established
+      })
     });
     
     console.log('🔐 Using PostgreSQL session store for persistence');

@@ -3,201 +3,143 @@ import './env.js';
 
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import * as schema from '../shared/schema.js'; // Import from unified PostgreSQL schema
+import * as schema from '../shared/schema.js'; // Import from unified PostgreSQL schema with .js extension
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Get current file's directory for ESM compatibility
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Type export for the schema
 export type PgSchema = typeof schema;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    'DATABASE_URL must be set. Did you forget to set it in your .env file or environment variables?',
-  );
-}
-
-// WORKAROUND: Instead of using connection string directly, which fails with special chars,
-// we'll parse the connection string manually and provide connection parameters separately
-
-// Default empty options
-const pgOptions: any = {
-  ssl: 'require', // Always enforce SSL for security
-  max: 10, // Connection pool size
-  idle_timeout: 20, // Seconds before closing idle connections
-  max_lifetime: 60 * 30, // Seconds before closing connections (even if active)
-};
-
-// This is a fail-safe approach that bypasses Node's URL parsing
-// for the connection string which breaks with special characters like # in the password
-try {
-  const connString = process.env.DATABASE_URL || '';
-  
-  // Find protocol end position
-  const protoEndPos = connString.indexOf('://'); 
-  if (protoEndPos === -1) {
-    throw new Error('Invalid connection string format');
-  }
-  
-  // Extract protocol (e.g., "postgres")
-  pgOptions.protocol = connString.substring(0, protoEndPos);
-  
-  // Find start of credentials
-  const credsStartPos = protoEndPos + 3;
-  
-  // Find end of credentials (@)
-  const credsEndPos = connString.indexOf('@', credsStartPos);
-  if (credsEndPos === -1) {
-    throw new Error('Could not find credentials separator @');
-  }
-  
-  // Extract credentials string
-  const credsString = connString.substring(credsStartPos, credsEndPos);
-  
-  // Find username/password separator
-  const credsDelimPos = credsString.indexOf(':');
-  if (credsDelimPos === -1) {
-    throw new Error('Could not find username/password delimiter');
-  }
-  
-  // Extract username and password
-  pgOptions.username = credsString.substring(0, credsDelimPos);
-  pgOptions.password = credsString.substring(credsDelimPos + 1);
-  
-  // Process host/port/database
-  const hostPortDbString = connString.substring(credsEndPos + 1);
-  
-  // Find database name separator
-  const dbSepPos = hostPortDbString.indexOf('/');
-  if (dbSepPos !== -1) {
-    // Extract hostname and port
-    const hostPortString = hostPortDbString.substring(0, dbSepPos);
-    const portSepPos = hostPortString.indexOf(':');
-    
-    if (portSepPos !== -1) {
-      pgOptions.host = hostPortString.substring(0, portSepPos);
-      pgOptions.port = parseInt(hostPortString.substring(portSepPos + 1), 10);
-    } else {
-      pgOptions.host = hostPortString;
-    }
-    
-    // Extract database name
-    pgOptions.database = hostPortDbString.substring(dbSepPos + 1);
-  } else {
-    // No database specified, only host and maybe port
-    const portSepPos = hostPortDbString.indexOf(':');
-    
-    if (portSepPos !== -1) {
-      pgOptions.host = hostPortDbString.substring(0, portSepPos);
-      pgOptions.port = parseInt(hostPortDbString.substring(portSepPos + 1), 10);
-    } else {
-      pgOptions.host = hostPortDbString;
-    }
-  }
-  
-  console.log(`Database connection configured for host: ${pgOptions.host}, database: ${pgOptions.database}`);
-} catch (err) {
-  console.error('Failed to parse database connection string:', err);
-  // Will continue with the original connection string as fallback
-}
-
-// Create the postgres client with our extracted parameters
-// For serverless environments like Vercel, we need to be careful with connection management
-console.log(`Configuring Postgres connection to ${pgOptions.host}:${pgOptions.port || 5432} for database ${pgOptions.database}`);
-
-// Set up connection options with only the supported properties for postgres-js
-// Define db variable outside try/catch for proper scoping
+// Declare variables at module level for exports
 let db: PostgresJsDatabase<PgSchema>;
+let sql: ReturnType<typeof postgres>;
+let isInitialized = false;
 
-try {
-  // Properly encode connection string components to handle special characters
-  // Instead of using DATABASE_URL directly, we'll construct it with proper encoding
-  let connectionString;
-  
-  if (process.env.DATABASE_URL) {
-    // Parse the connection string components safely
-    const dbUrlMatch = process.env.DATABASE_URL.match(/postgres:\/\/([^:]+):([^@]+)@([^/]+)\/(.+)/);
-    
-    if (dbUrlMatch) {
-      const [, user, password, hostPort, database] = dbUrlMatch;
-      // Encode each component separately to handle special chars in password
-      const encodedUser = encodeURIComponent(user);
-      const encodedPassword = encodeURIComponent(password);
-      const dbName = database.split('?')[0]; // Remove query params if any
-      const queryParams = database.includes('?') ? '?' + database.split('?')[1] : '';
-      
-      connectionString = `postgres://${encodedUser}:${encodedPassword}@${hostPort}/${dbName}${queryParams}`;
-      console.log(`Using properly encoded database connection string`);
-    } else {
-      console.warn('Could not parse DATABASE_URL, using original (may cause errors if it contains special characters)');
-      connectionString = process.env.DATABASE_URL;
-    }
-  } else if (pgOptions.user && pgOptions.password && pgOptions.host && pgOptions.database) {
-    // Construct from parsed components
-    const port = pgOptions.port || 5432;
-    connectionString = `postgres://${encodeURIComponent(pgOptions.user)}:${encodeURIComponent(pgOptions.password)}@${pgOptions.host}:${port}/${pgOptions.database}`;
-    console.log('Using constructed connection string from parsed components');
-  } else {
-    throw new Error('No valid database connection information available');
+/**
+ * Initializes the database client for connection to Supabase
+ * This function supports both development and production environments,
+ * with special handling for Vercel serverless functions
+ */
+export async function initializeDbClient(): Promise<PostgresJsDatabase<PgSchema>> {
+  // If already initialized, return existing instance
+  if (isInitialized && db) {
+    return db;
   }
-  
-  // Create the postgres client using parsed parameters instead of raw connection string
-  // This avoids issues with special characters in passwords
-  const client = postgres({
-    host: pgOptions.host,
-    port: pgOptions.port || 5432,
-    database: pgOptions.database,
-    username: pgOptions.user,
-    password: pgOptions.password,
-    ssl: 'require',  // Always enforce SSL for security
-    max: 5,          // Reduce connection pool size for serverless
-    idle_timeout: 10, // Close idle connections faster
-    max_lifetime: 60, // Close connections after a minute to prevent hanging connections
-    connect_timeout: 30, // Timeout after 30s if cannot connect
-    prepare: false,   // Don't prepare statements (reduces overhead)
-  });
-  
-  console.log(`Using database connection with parsed options (host: ${pgOptions.host}, db: ${pgOptions.database})`);
-  
-  // Verify connection works by testing a simple query
-  // Use immediate invocation to handle the async operation
-  await (async () => {
-    try {
-      const testResult = await client`SELECT 1 as connection_test`;
-      console.log('✅ Database connection verified successfully');  
-    } catch (testError: any) { // Type as any to access .message property safely
-      console.error('❌ Database connection test failed:', testError);
-      throw new Error(`Database connection test failed: ${testError?.message || String(testError)}`);
+
+  try {
+    console.log('Initializing PostgreSQL client with Supabase DATABASE_URL');
+    
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is required');
     }
-  })();
-  
-  // Initialize the Drizzle ORM with our client and schema
-  db = drizzle(client, { schema });
-  
-  // Add connection validation test (don't block initialization)
-  client.unsafe("SELECT 1 as connection_test").then(() => {
-    console.log(`✅ PostgreSQL connection validated successfully to ${pgOptions.host}`);
-  }).catch(err => {
-    console.error(`❌ PostgreSQL connection validation failed:`, err);
-  });
-  
-  console.log(`PostgreSQL client initialized successfully for ${pgOptions.host}`);
-} catch (error) {
-  console.error(`❌ Critical error creating PostgreSQL client:`, error);
-  
-  // Re-throw to prevent app from running with broken DB connection in production
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(`Failed to initialize PostgreSQL client: ${error instanceof Error ? error.message : String(error)}`);
-  } else {
-    console.warn(`⚠️ Running in development mode with potentially broken DB connection`);
-    // Create a minimum viable client for development debugging
-    const fallbackClient = postgres(process.env.DATABASE_URL, { ssl: 'require' });
+
+    // Create the postgres client with optimized settings for serverless
+    // Detect environment for appropriate connection handling
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV !== undefined;
+    const isPooled = process.env.DATABASE_URL.includes('pooler.supabase.com');
+    console.log(`Using ${isPooled ? 'pooled' : 'direct'} database connection in ${isProduction ? 'production' : 'development'} environment`);
+    
+    // Path to SSL certificate
+    const certPath = path.resolve(process.cwd(), 'prod-ca-2021.crt');
+    
+    // Check for SSL certificate without using synchronous methods
+    // Define proper type for the SSL config to match postgres.js requirements
+    // postgres.js accepts boolean | object with SSL options
+    let sslConfig: boolean | { ca?: string; rejectUnauthorized?: boolean } = { rejectUnauthorized: false }; // Default setting that works with Supabase
+    
+    try {
+      const certExists = fs.existsSync(certPath);
+      if (certExists) {
+        const certContent = fs.readFileSync(certPath, 'utf8');
+        sslConfig = {
+          ca: certContent,
+          rejectUnauthorized: isProduction // Only enforce in production
+        };
+        console.log('SSL certificate found and loaded');
+      } else {
+        console.log(`SSL certificate not found at ${certPath}`);
+      }
+    } catch (err: unknown) {
+      // Handle error with proper type checking
+      const error = err as Error;
+      console.log(`Error loading SSL certificate: ${error.message}`);
+    }
+    
+    sql = postgres(process.env.DATABASE_URL, {
+      ssl: sslConfig,       // Use SSL with certificate if available
+      max: isPooled ? 10 : 5, // Larger pool for pooled connections
+      idle_timeout: 10,     // Close idle connections faster
+      max_lifetime: 60,     // Close connections after a minute
+      connect_timeout: 30,  // Timeout after 30s if cannot connect
+      prepare: false,       // Don't prepare statements (reduces overhead)
+    });
+    
+    // Test the connection with timeout and retries
+    let connected = false;
+    let retries = 3;
+    let lastError: Error | unknown = null;
+
+    while (retries > 0 && !connected) {
+      try {
+        console.log(`Testing database connection (attempt ${4 - retries}/3)...`);
+        await sql`SELECT 1`;
+        connected = true;
+        console.log('✅ Supabase database connection successful');
+      } catch (error) {
+        lastError = error;
+        retries--;
+        if (retries > 0) {
+          const delay = 1000 * Math.pow(2, 3 - retries - 1); // Exponential backoff
+          console.log(`⚠️ Database connection failed, retrying in ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+
+    if (!connected) {
+      throw new Error(`Database connection failed after multiple attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+    }
+    
+    // Initialize Drizzle with our schema
+    db = drizzle(sql, { schema });
+    isInitialized = true;
+    
+    return db;
+  } catch (error) {
+    console.error('❌ Failed to connect to Supabase database:', error);
+    
+    // In production, fail hard on connection errors
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
+      throw new Error(`Critical database connection failure: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    
+    // In development, create a minimal connection for debugging purposes
+    console.warn('⚠️ Running in development mode with potentially broken DB connection');
+    const fallbackClient = postgres(process.env.DATABASE_URL || '', { ssl: 'require' });
     db = drizzle(fallbackClient, { schema });
+    return db;
   }
 }
 
-// Export the db instance
-export { db };
+// Initialize the connection immediately if not in a serverless environment
+// In serverless, we'll initialize on-demand when the function is called
+if (typeof process.env.AWS_LAMBDA_FUNCTION_NAME === 'undefined' && 
+    typeof process.env.VERCEL === 'undefined') {
+  console.log('Non-serverless environment detected, initializing database connection');
+  initializeDbClient().catch(err => {
+    console.error('Failed to initialize database on startup:', err);
+  });
+} else {
+  console.log('Serverless environment detected, database will initialize on first request');
+}
+
+// Export the db instance and sql client
+export { db, sql };
 
 // Export all named exports from the schema module for easy access elsewhere
-// This makes it easy to use your tables, relations, etc.
 export * from '../shared/schema.js';
-
-console.log(`Connected to PostgreSQL on ${pgOptions.host} as ${pgOptions.username}`);
