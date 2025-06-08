@@ -12,7 +12,7 @@
     "dev:full": "echo 'Starting full development environment...' && echo 'Backend: http://localhost:3000' && echo 'Frontend: http://localhost:5173' && concurrently \"npm run dev\" \"npm run dev:client\"",
     "build:server": "rm -rf build/server-out && tsc -p tsconfig.server.json && node scripts/clean-build.js",
     "build:client": "rm -rf dist && vite build",
-    "build": "npm run build:server && npm run build:client",
+    "build": "npm run build:server && npm run db:migrate-pg && npm run build:client",
     "build:api": "npm run build:server",
     "start": "node api/index.js",
     "check": "tsc && tsc -p tsconfig.server.json --noEmit",
