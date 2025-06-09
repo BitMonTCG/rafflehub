@@ -176,8 +176,16 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
           ? data.cardDetails.split('\n').filter(s => s.trim().length > 0)
           : Array.isArray(data.cardDetails) 
             ? data.cardDetails 
-            : []
+            : [],
+        // Ensure optional fields are properly handled
+        backImageUrl: data.backImageUrl || undefined,
+        priceSource: data.priceSource || undefined,
+        psaGrade: data.psaGrade || undefined,
+        psaCertNumber: data.psaCertNumber || undefined,
+        series: data.series || undefined
       };
+
+      console.log('🚀 Sending raffle data:', JSON.stringify(formattedData, null, 2));
       
       if (isEditing && raffle) {
         await updateRaffle.mutateAsync({

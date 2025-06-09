@@ -715,17 +715,26 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
 
   app.post('/api/raffles', ensureAdmin, async (req: Request, res: Response) => {
     try {
+      console.log('📥 Received raffle creation request:', JSON.stringify(req.body, null, 2));
+      
       // Parse request body against the schema
       const raffleData = insertRaffleSchema.parse(req.body);
+      console.log('✅ Schema validation passed:', JSON.stringify(raffleData, null, 2));
+      
       // Pass the parsed and validated data to storage
       const newRaffle = await storageInstance.createRaffle(raffleData);
+      console.log('✅ Raffle created successfully:', newRaffle.id);
+      
       broadcast({ type: 'RAFFLE_CREATED', raffle: newRaffle });
       res.status(201).json(newRaffle);
     } catch (error) {
        if (error instanceof ZodError) {
+         console.log('❌ Zod validation error:', fromZodError(error).message);
+         console.log('❌ Zod error details:', JSON.stringify(error.issues, null, 2));
          return res.status(400).json({ message: fromZodError(error).message });
       }
-      console.log(`Error creating raffle: ${error}`);
+      console.log(`❌ Error creating raffle:`, error);
+      console.log(`❌ Error stack:`, (error as Error)?.stack);
       res.status(500).json({ message: "Error creating raffle" });
     }
   });
