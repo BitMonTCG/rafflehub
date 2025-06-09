@@ -5,15 +5,12 @@
 ALTER TABLE "raffles"
   ADD COLUMN IF NOT EXISTS "winner_id" integer;
 
--- Add foreign key constraint if missing, catch errors for undefined column or existing constraint
-DO $$
-BEGIN
-  ALTER TABLE "raffles"
-    ADD CONSTRAINT "raffles_winner_id_users_id_fk"
-    FOREIGN KEY ("winner_id")
-    REFERENCES "users"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-EXCEPTION
-  WHEN duplicate_object OR undefined_column THEN NULL;
-END $$;
+-- Ensure foreign key constraint on winner_id idempotently
+ALTER TABLE IF EXISTS "raffles"
+  DROP CONSTRAINT IF EXISTS "raffles_winner_id_users_id_fk";
+ALTER TABLE "raffles"
+  ADD CONSTRAINT "raffles_winner_id_users_id_fk"
+  FOREIGN KEY ("winner_id")
+  REFERENCES "users"("id")
+  ON DELETE NO ACTION
+  ON UPDATE NO ACTION;
