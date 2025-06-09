@@ -178,11 +178,17 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        // For Vercel: secure should be auto-detected from X-Forwarded-Proto header
+        secure: 'auto', // Express will detect HTTPS via X-Forwarded-Proto 
         httpOnly: true,
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000 // 1 day
+        maxAge: 24 * 60 * 60 * 1000, // 1 day
+        // Add domain configuration for production
+        domain: process.env.NODE_ENV === 'production' ? '.bitmontcg.io' : undefined,
       },
+      name: 'rafflehub_session', // Use consistent session name
+      // Trust proxy for Vercel
+      proxy: true,
     })
   );
 
@@ -329,32 +335,7 @@ export async function registerRoutes(app: Express, storageInstance: IStorage): P
   app.use(express.json());
   app.use(express.urlencoded({ extended: false })); // Add urlencoded parser for form submissions if any
 
-  // Session setup (ensure sessionSecret is defined)
-if (!process.env.SESSION_SECRET) {
-  throw new Error('SESSION_SECRET must be set in environment variables.');
-}
-const sessionSecret = process.env.SESSION_SECRET;
-  
-  // Cookie configuration for production-ready security
-  const cookieConfig = {
-    secure: false, // Set to false to work in both HTTP (dev) and HTTPS (prod) - Vercel handles HTTPS termination
-    httpOnly: true,
-    sameSite: 'lax' as const, // Use 'lax' for better compatibility
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-  };
-  
-  // Add session store debug logging
-  console.log('Session store type:', usePgSession ? 'PostgreSQL' : 'Memory');
-  console.log('DATABASE_URL available:', !!process.env.DATABASE_URL);
-  
-  app.use(session({
-    store: sessionStoreInstance,
-    secret: sessionSecret,
-    resave: false, // Changed from true to false for better session handling
-    saveUninitialized: false,
-    cookie: cookieConfig,
-    name: 'bitmon_sid',
-  }));
+  // Note: Session configuration already set up above - do not duplicate
 
   app.use(passport.initialize());
   app.use(passport.session());
@@ -436,17 +417,18 @@ const sessionSecret = process.env.SESSION_SECRET;
     done(null, user.id);
   });
   passport.deserializeUser(async (id: string | number, done) => {
-    // ... (existing deserializeUser logic) ...
+    console.log('🔍 Deserializing user with ID:', id, 'Type:', typeof id);
     try {
       if (id === 'admin_user_id') {
-      const adminUsername = process.env.ADMIN_USERNAME;
-      if (!adminUsername) {
-        console.error('ADMIN_USERNAME not set, cannot deserialize .env admin');
-        return done(new Error('Admin configuration error'), null);
+        const adminUsername = process.env.ADMIN_USERNAME;
+        if (!adminUsername) {
+          console.error('ADMIN_USERNAME not set, cannot deserialize .env admin');
+          return done(new Error('Admin configuration error'), null);
+        }
+        const envAdminUser = { id: 'admin_user_id', username: adminUsername, role: 'admin' };
+        console.log('✅ Deserialized admin user:', envAdminUser);
+        return done(null, envAdminUser);
       }
-      const envAdminUser = { id: 'admin_user_id', username: adminUsername, role: 'admin' };
-      return done(null, envAdminUser);
-    }
     const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
     if (isNaN(numericId)) { 
         console.warn(`deserializeUser received non-numeric, non-admin ID: ${id}`);
