@@ -476,6 +476,20 @@ const sessionSecret = process.env.SESSION_SECRET;
     message: { message: 'Too many login attempts, please try again later' },
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    // Handle Vercel proxy setup - use forwarded IP or fallback to connection IP
+    keyGenerator: (req) => {
+      // Vercel forwards the real IP in x-forwarded-for or x-real-ip
+      return req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || 
+             req.headers['x-real-ip']?.toString() || 
+             req.ip || 
+             req.connection.remoteAddress || 
+             'unknown';
+    },
+    // Skip rate limiting validation errors for trusted proxy environments  
+    skip: (req) => {
+      // Skip validation entirely to avoid trust proxy errors
+      return false;
+    },
   });
 
   // Authentication routes (POST will be CSRF protected by middleware above)

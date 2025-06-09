@@ -32,8 +32,15 @@ export function performanceMiddleware() {
       const { method } = req;
       const { statusCode } = res;
       
-      // Add headers for tracking (useful for debugging and client-side monitoring)
-      res.setHeader('X-Response-Time', `${duration}ms`);
+      // Only set headers if they haven't been sent yet (prevents crash)
+      if (!res.headersSent) {
+        try {
+          res.setHeader('X-Response-Time', `${duration}ms`);
+        } catch (error) {
+          // Silently ignore header setting errors to prevent crashes
+          console.warn(`Failed to set performance header for ${method} ${route}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
       
       if (req.log) {
         // Log detailed performance metrics if pino logger is attached to the request
