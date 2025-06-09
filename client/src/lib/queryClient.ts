@@ -7,6 +7,24 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+async function getCsrfToken(): Promise<string> {
+  try {
+    const csrfRes = await fetch('/api/csrf-token', {
+      credentials: 'include'
+    });
+    if (csrfRes.ok) {
+      const tokenData = await csrfRes.json();
+      return tokenData.csrfToken;
+    } else {
+      console.error('Failed to fetch CSRF token:', await csrfRes.text());
+      return '';
+    }
+  } catch (error) {
+    console.error('Error fetching CSRF token:', error);
+    return '';
+  }
+}
+
 export async function apiRequest<T = any>(
   url: string,
   options?: {
@@ -23,6 +41,15 @@ export async function apiRequest<T = any>(
   
   if (body && !headers['Content-Type']) {
     requestHeaders['Content-Type'] = 'application/json';
+  }
+  
+  // Add CSRF token for mutation requests (POST, PUT, PATCH, DELETE)
+  const mutationMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+  if (mutationMethods.includes(method.toUpperCase())) {
+    const csrfToken = await getCsrfToken();
+    if (csrfToken) {
+      requestHeaders['X-CSRF-Token'] = csrfToken;
+    }
   }
   
   const res = await fetch(url, {
