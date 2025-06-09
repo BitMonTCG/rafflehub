@@ -17,7 +17,7 @@
     "start": "node api/index.js",
     "check": "tsc && tsc -p tsconfig.server.json --noEmit",
     "db:generate-pg": "drizzle-kit generate --config ./drizzle.config.ts",
-    "db:migrate-pg": "tsc ./scripts/apply-migrations.ts --outDir ./build/scripts --module NodeNext --moduleResolution NodeNext --esModuleInterop --target ES2022 --resolveJsonModule && node ./build/scripts/apply-migrations.js",
+    "db:migrate-pg": "node ./scripts/apply-migrations.js",
     "db:push": "drizzle-kit push --config ./drizzle.config.ts",
     "db:migrate": "tsc ./scripts/apply-migrations.ts --outDir ./build/scripts --module NodeNext --moduleResolution NodeNext --esModuleInterop --target ES2022 --resolveJsonModule && node ./build/scripts/apply-migrations.js",
     "test": "vitest run",
