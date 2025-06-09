@@ -29,8 +29,7 @@ export function useClaimPrize() {
   
   return useMutation({
     mutationFn: async (winnerId: number) => {
-      const res = await apiRequest(`/api/winners/${winnerId}`, { method: 'PATCH', body: { claimed: true } });
-      return res.json();
+      return await apiRequest(`/api/winners/${winnerId}`, { method: 'PATCH', body: { claimed: true } });
     },
     onSuccess: (_, variables) => {
       toast({
