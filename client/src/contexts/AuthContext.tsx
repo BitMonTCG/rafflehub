@@ -29,12 +29,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Helper function to determine if user is admin
+  const checkIsAdmin = (userData: any): boolean => {
+    if (!userData) return false;
+    // Check for database admin users (isAdmin: true/1)
+    if (userData.isAdmin === true || userData.isAdmin === 1) return true;
+    // Check for environment admin users (role: 'admin')
+    if (userData.role === 'admin') return true;
+    return false;
+  };
+
+  // Helper function to normalize user data
+  const normalizeUserData = (userData: any): User => {
+    const isAdmin = checkIsAdmin(userData);
+    return {
+      id: userData.id,
+      username: userData.username,
+      email: userData.email || '', // Fallback for admin users that might not have email
+      isAdmin,
+      createdAt: userData.createdAt || new Date().toISOString(),
+    };
+  };
+
   // Load user from localStorage on initial render
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const rawUserData = JSON.parse(storedUser);
+        const normalizedUser = normalizeUserData(rawUserData);
+        setUser(normalizedUser);
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');
@@ -93,24 +117,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       const responseData = await response.json();
-      const userDataToSet = isAdminLogin && responseData.user ? responseData.user : responseData;
-
-      if (!userDataToSet || typeof userDataToSet.username === 'undefined') {
-          console.error('Login response did not contain expected user data:', responseData);
-          toast({
-              title: 'Login Failed',
-              description: 'Received an unexpected response from the server.',
-              variant: 'destructive',
-          });
-          return false;
+      
+      // Extract user data correctly for both admin and regular login
+      let rawUserData;
+      if (isAdminLogin) {
+        // Admin login returns: { message: 'Admin login successful', user: { username, role, id } }
+        rawUserData = responseData.user || responseData;
+      } else {
+        // Regular login returns user data directly
+        rawUserData = responseData;
       }
 
-      setUser(userDataToSet);
-      localStorage.setItem('user', JSON.stringify(userDataToSet));
+      if (!rawUserData || typeof rawUserData.username === 'undefined') {
+        console.error('Login response did not contain expected user data:', responseData);
+        toast({
+          title: 'Login Failed',
+          description: 'Received an unexpected response from the server.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      // Normalize user data to match frontend type expectations
+      const normalizedUser = normalizeUserData(rawUserData);
       
+      console.log('Setting user after login:', normalizedUser); // Debug log
+      
+      setUser(normalizedUser);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      
+      const adminStatus = normalizedUser.isAdmin ? ' (Admin)' : '';
       toast({
         title: 'Login Successful',
-        description: `Welcome back, ${userDataToSet.username}!`,
+        description: `Welcome back, ${normalizedUser.username}!${adminStatus}`,
       });
       
       return true;
@@ -171,19 +210,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      const userData = await response.json();
-      if (!userData || typeof userData.username === 'undefined') {
-          console.error('Registration response did not contain expected user data:', userData);
-          toast({
-              title: 'Registration Failed',
-              description: 'Received an unexpected response from the server after registration.',
-              variant: 'destructive',
-          });
-          return false;
+      const rawUserData = await response.json();
+      if (!rawUserData || typeof rawUserData.username === 'undefined') {
+        console.error('Registration response did not contain expected user data:', rawUserData);
+        toast({
+          title: 'Registration Failed',
+          description: 'Received an unexpected response from the server after registration.',
+          variant: 'destructive',
+        });
+        return false;
       }
 
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
+      const normalizedUser = normalizeUserData(rawUserData);
+      setUser(normalizedUser);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
       
       toast({
         title: 'Registration Successful',
@@ -259,6 +299,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const isAdmin = checkIsAdmin(user);
+
   return (
     <AuthContext.Provider
       value={{
@@ -268,7 +310,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         isAuthenticated: !!user,
-        isAdmin: user?.isAdmin || false,
+        isAdmin,
       }}
     >
       {children}
