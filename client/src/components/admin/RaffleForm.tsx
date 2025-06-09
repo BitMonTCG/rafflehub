@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -41,8 +41,8 @@ const formSchema = z.object({
   psaGrade: z.coerce.number().int().min(1).max(10).optional(),
   psaCertNumber: z.string().optional(),
   series: z.string().optional(),
-  // First get the string value, then convert it to array for storage
-  cardDetails: z.string().transform(str => str.split('\n').filter(s => s.trim().length > 0)),
+  // Keep as string in form, convert to array in onSubmit
+  cardDetails: z.string(),
   totalTickets: z.coerce.number().int().positive().default(100),
   isFeatured: z.boolean().default(false),
 });
@@ -61,7 +61,7 @@ interface FormValues {
   psaGrade?: number;
   psaCertNumber?: string;
   series?: string;
-  // This will be a string in the form but transformed to array on submit
+  // This will be a string in the form but converted to array on submit
   cardDetails: string;
   totalTickets: number;
   isFeatured: boolean;
@@ -171,8 +171,12 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
         retailPrice: Math.round(data.retailPrice * 100),
         winnerPrice: Math.round(data.winnerPrice * 100),
         ticketPrice: Math.round(data.ticketPrice * 100),
-        // Convert string to array for API
-        cardDetails: data.cardDetails.split('\n').filter(s => s.trim().length > 0)
+        // Convert string to array for API - handle cases where it might already be an array or undefined
+        cardDetails: typeof data.cardDetails === 'string' 
+          ? data.cardDetails.split('\n').filter(s => s.trim().length > 0)
+          : Array.isArray(data.cardDetails) 
+            ? data.cardDetails 
+            : []
       };
       
       if (isEditing && raffle) {
@@ -195,6 +199,9 @@ const RaffleForm: React.FC<RaffleFormProps> = ({ raffle, isOpen, onClose }) => {
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Raffle' : 'Create New Raffle'}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? 'Update the raffle details below.' : 'Fill in the details to create a new raffle. You can search for Pokemon cards to auto-populate fields.'}
+          </DialogDescription>
         </DialogHeader>
         
         {!isEditing && (
