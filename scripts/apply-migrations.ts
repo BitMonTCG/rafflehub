@@ -13,7 +13,7 @@ async function main() {
 
   console.log('Connecting to the database to apply migrations...');
   // Use a single connection for the migration script
-  const migrationClient = postgres(databaseUrl, { max: 1 });
+  const migrationClient = postgres(databaseUrl, { max: 1, ssl: 'require' });
   const db = drizzle(migrationClient);
 
   try {

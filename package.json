@@ -19,7 +19,7 @@
     "db:generate-pg": "drizzle-kit generate --config ./drizzle.config.ts",
     "db:migrate-pg": "node ./scripts/apply-migrations.js",
     "db:push": "drizzle-kit push --config ./drizzle.config.ts",
-    "db:migrate": "tsc ./scripts/apply-migrations.ts --outDir ./build/scripts --module NodeNext --moduleResolution NodeNext --esModuleInterop --target ES2022 --resolveJsonModule && node ./build/scripts/apply-migrations.js",
+    "db:migrate": "tsx ./scripts/apply-migrations.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -152,7 +152,7 @@
     "supertest": "^6.3.4",
     "tailwindcss": "^3.4.14",
     "tsx": "^4.19.4",
-    "typescript": "5.6.3",
+    "typescript": "~5.4.5",
     "vite": "^6.3.4",
     "vitest": "^3.1.3"
   },
