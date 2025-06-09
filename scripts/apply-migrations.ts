@@ -18,10 +18,9 @@ async function main() {
 
   try {
     console.log('Applying database migrations from ./drizzle folder...');
-    // Assumes your migration files are in the './drizzle' directory,
-    // which is common and suggested by your project structure memory.
-    // If drizzle.config.ts specifies a different 'out' directory, adjust 'migrationsFolder' accordingly.
-    await migrate(db, { migrationsFolder: './drizzle' });
+    // Use the correct migrations folder path as specified in drizzle.config.ts
+    // This ensures compatibility with Vercel deployment
+    await migrate(db, { migrationsFolder: './drizzle/postgresql' });
     console.log('Database migrations applied successfully.');
   } catch (error) {
     console.error('Error applying database migrations:', error);
