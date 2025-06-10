@@ -219,6 +219,7 @@ export class DatabaseStorage implements IStorage {
       isFeatured: validatedRaffle.isFeatured!,
       isActive: validatedRaffle.isActive!,
       ticketPrice: validatedRaffle.ticketPrice!, // Added missing ticketPrice
+      startDate: new Date(), // Explicitly set startDate
     };
 
     // Using as any is a temporary workaround for TypeScript + Drizzle + Zod compatibility issues
