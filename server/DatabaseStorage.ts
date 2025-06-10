@@ -218,6 +218,7 @@ export class DatabaseStorage implements IStorage {
       totalTickets: validatedRaffle.totalTickets!,
       isFeatured: validatedRaffle.isFeatured!,
       isActive: validatedRaffle.isActive!,
+      ticketPrice: validatedRaffle.ticketPrice!, // Added missing ticketPrice
     };
 
     // Using as any is a temporary workaround for TypeScript + Drizzle + Zod compatibility issues
